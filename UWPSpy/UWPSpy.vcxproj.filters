@@ -46,4 +46,9 @@
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="_exports.def">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>
