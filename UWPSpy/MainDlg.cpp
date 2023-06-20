@@ -6,6 +6,10 @@
 
 namespace {
 
+// Delay each tree redraw, redrawing at most once every kRedrawTreeDelay ms.
+// Otherwise, multiple redraw operations can make the UI very slow.
+constexpr UINT kRedrawTreeDelay = 200;
+
 // https://github.com/sumatrapdfreader/sumatrapdf/blob/9a2183db3c3db5cbf242ac9d8f8576750f581096/src/utils/WinUtil.cpp#L2863
 void TreeViewExpandRecursively(HWND hTree, HTREEITEM hItem, DWORD flag) {
     while (hItem) {
@@ -252,12 +256,14 @@ void CMainDlg::ElementAdded(const ParentChildRelation& parentChildRelation,
         selectedItemVisible = true;
     }
 
-    treeView.SetRedraw(FALSE);
+    if (!m_redrawTreeQueued) {
+        treeView.SetRedraw(FALSE);
+        SetTimer(TIMER_ID_REDRAW_TREE, kRedrawTreeDelay);
+        m_redrawTreeQueued = true;
+    }
 
     AddItemToTree(parentItem, insertAfter, element.Handle,
                   &itElementItem->second);
-
-    treeView.SetRedraw(TRUE);
 
     // Make sure the selected item remains visible.
     if (selectedItem && selectedItemVisible) {
@@ -283,7 +289,11 @@ void CMainDlg::ElementRemoved(InstanceHandle handle) {
         selectedItemVisible = true;
     }
 
-    treeView.SetRedraw(FALSE);
+    if (!m_redrawTreeQueued) {
+        treeView.SetRedraw(FALSE);
+        SetTimer(TIMER_ID_REDRAW_TREE, kRedrawTreeDelay);
+        m_redrawTreeQueued = true;
+    }
 
     if (it->second.treeItem) {
         bool deleted = treeView.DeleteItem(it->second.treeItem);
@@ -313,8 +323,6 @@ void CMainDlg::ElementRemoved(InstanceHandle handle) {
 
         clearTreeItemRecursive(handle, &it->second);
     }
-
-    treeView.SetRedraw(TRUE);
 
     // Make sure the selected item remains visible.
     if (selectedItem && selectedItemVisible) {
@@ -388,6 +396,19 @@ void CMainDlg::OnHotKey(int nHotKeyID, UINT uModifiers, UINT uVirtKey) {
         case HOTKEY_SELECT_ELEMENT_FROM_CURSOR:
             SelectElementFromCursor();
             break;
+    }
+}
+
+void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
+    switch (nIDEvent) {
+        case TIMER_ID_REDRAW_TREE: {
+            KillTimer(TIMER_ID_REDRAW_TREE);
+            m_redrawTreeQueued = false;
+
+            auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+            treeView.SetRedraw(TRUE);
+            break;
+        }
     }
 }
 
@@ -706,11 +727,17 @@ void CMainDlg::OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl) {
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
     auto root = treeView.GetRootItem();
     if (root) {
-        treeView.SetRedraw(FALSE);
+        if (!m_redrawTreeQueued) {
+            treeView.SetRedraw(FALSE);
+        }
+
         treeView.SelectItem(root);
         TreeViewExpandRecursively(treeView, root, TVE_COLLAPSE);
         treeView.EnsureVisible(root);
-        treeView.SetRedraw(TRUE);
+
+        if (!m_redrawTreeQueued) {
+            treeView.SetRedraw(TRUE);
+        }
     }
 }
 
@@ -718,11 +745,17 @@ void CMainDlg::OnExpandAll(UINT uNotifyCode, int nID, CWindow wndCtl) {
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
     auto root = treeView.GetRootItem();
     if (root) {
-        treeView.SetRedraw(FALSE);
+        if (!m_redrawTreeQueued) {
+            treeView.SetRedraw(FALSE);
+        }
+
         TreeViewExpandRecursively(treeView, root, TVE_EXPAND);
         auto selected = treeView.GetSelectedItem();
         treeView.EnsureVisible(selected ? selected : root);
-        treeView.SetRedraw(TRUE);
+
+        if (!m_redrawTreeQueued) {
+            treeView.SetRedraw(TRUE);
+        }
     }
 }
 

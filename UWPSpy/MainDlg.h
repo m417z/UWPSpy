@@ -12,6 +12,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     };
 
     enum {
+        TIMER_ID_REDRAW_TREE = 1,
+    };
+
+    enum {
         UWM_ACTIVATE_WINDOW = WM_APP,
     };
 
@@ -29,6 +33,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         MSG_WM_INITDIALOG(OnInitDialog)
         MSG_WM_DESTROY(OnDestroy)
         MSG_WM_HOTKEY(OnHotKey)
+        MSG_WM_TIMER(OnTimer)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_SELCHANGED,
                           OnElementTreeSelChaneged)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_KEYDOWN, OnElementTreeKeyDown)
@@ -110,6 +115,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     BOOL OnInitDialog(CWindow wndFocus, LPARAM lInitParam);
     void OnDestroy();
     void OnHotKey(int nHotKeyID, UINT uModifiers, UINT uVirtKey);
+    void OnTimer(UINT_PTR nIDEvent);
     LRESULT OnElementTreeSelChaneged(LPNMHDR pnmh);
     LRESULT OnElementTreeKeyDown(LPNMHDR pnmh);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
@@ -141,6 +147,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     bool m_detailedProperties = false;
     bool m_splitModeAttributesExpanded = false;
     bool m_registeredHotkeySelectElementFromCursor = false;
+    bool m_redrawTreeQueued = false;
 
     winrt::com_ptr<IVisualTreeService3> m_visualTreeService;
     winrt::com_ptr<IXamlDiagnostics> m_xamlDiagnostics;
