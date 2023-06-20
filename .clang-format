@@ -1,0 +1,15 @@
+BasedOnStyle: Chromium
+IndentWidth: 4
+
+# Make sure code like:
+# IPC_BEGIN_MESSAGE_MAP()
+#   IPC_MESSAGE_HANDLER(WidgetHostViewHost_Update, OnUpdate)
+# IPC_END_MESSAGE_MAP()
+# gets correctly indented.
+MacroBlockBegin: "^\
+BEGIN_MSG_MAP|\
+BEGIN_MSG_MAP_EX|\
+BEGIN_DLGRESIZE_MAP$"
+MacroBlockEnd: "^\
+END_MSG_MAP|\
+END_DLGRESIZE_MAP$"

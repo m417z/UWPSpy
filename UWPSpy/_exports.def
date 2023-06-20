@@ -1,3 +1,5 @@
 LIBRARY
 EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE
     start @1

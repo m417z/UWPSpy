@@ -1,55 +1,89 @@
-// UWPSpy.cpp : main source file for UWPSpy.exe
-//
-
 #include "stdafx.h"
 
-#include "resource.h"
-
 #include "MainDlg.h"
+#include "tap.hpp"
 
-HINSTANCE g_hinstDLL;
+using PFN_INITIALIZE_XAML_DIAGNOSTICS_EX =
+    decltype(&InitializeXamlDiagnosticsEx);
 
 CAppModule _Module;
 
-BOOL WINAPI DllMain(
-	HINSTANCE hinstDLL,  // handle to DLL module
-	DWORD fdwReason,     // reason for calling function
-	LPVOID lpvReserved)  // reserved
-{
-	switch (fdwReason)
-	{
-	case DLL_PROCESS_ATTACH:
-		g_hinstDLL = hinstDLL;
-		break;
+namespace {
 
-	case DLL_THREAD_ATTACH:
-	case DLL_THREAD_DETACH:
-	case DLL_PROCESS_DETACH:
-		break;
-	}
+ATOM RegisterDialogClass(LPCTSTR lpszClassName, HINSTANCE hInstance) {
+    WNDCLASS wndcls;
+    ::GetClassInfo(hInstance, MAKEINTRESOURCE(32770), &wndcls);
 
-	return TRUE;
+    // Set our own class name.
+    wndcls.lpszClassName = lpszClassName;
+
+    // Just register the class.
+    return ::RegisterClass(&wndcls);
 }
 
-int WINAPI start()
+}  // namespace
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL,  // handle to DLL module
+                    DWORD fdwReason,     // reason for calling function
+                    LPVOID lpvReserved)  // reserved
 {
-	HRESULT hRes = ::CoInitialize(NULL);
-	ATLASSERT(SUCCEEDED(hRes));
+    switch (fdwReason) {
+        case DLL_PROCESS_ATTACH: {
+            HRESULT hRes = _Module.Init(nullptr, hinstDLL);
+            ATLASSERT(SUCCEEDED(hRes));
 
-	AtlInitCommonControls(ICC_BAR_CLASSES);	// add flags to support other controls
+            RegisterDialogClass(L"UWPSpy", hinstDLL);
+        } break;
 
-	hRes = _Module.Init(NULL, g_hinstDLL);
-	ATLASSERT(SUCCEEDED(hRes));
+        case DLL_THREAD_ATTACH:
+        case DLL_THREAD_DETACH:
+            break;
 
-	int nRet = 0;
-	// BLOCK: Run application
-	{
-		CMainDlg dlgMain;
-		nRet = (int)dlgMain.DoModal();
-	}
+        case DLL_PROCESS_DETACH:
+            UnregisterClass(L"UWPSpy", hinstDLL);
 
-	_Module.Term();
-	::CoUninitialize();
+            _Module.Term();
+            break;
+    }
 
-	return nRet;
+    return TRUE;
+}
+
+HRESULT WINAPI start(DWORD pid) {
+    // Calling InitializeXamlDiagnosticsEx the second time will reset the
+    // existing element tree callbacks. Therefore, first check for an existing
+    // window for the target process.
+    auto windowTitle = std::format(L"UWPSpy - PID: {}", pid);
+    HWND existingWindow = FindWindow(L"UWPSpy", windowTitle.c_str());
+    if (existingWindow) {
+        PostMessage(existingWindow, CMainDlg::UWM_ACTIVATE_WINDOW, 0, 0);
+        return S_OK;
+    }
+
+    WCHAR location[MAX_PATH];
+    switch (GetModuleFileName(_Module.m_hInst, location, ARRAYSIZE(location))) {
+        case 0:
+        case ARRAYSIZE(location):
+            return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    const HMODULE wux(LoadLibraryEx(L"Windows.UI.Xaml.dll", nullptr,
+                                    LOAD_LIBRARY_SEARCH_SYSTEM32));
+    if (!wux) [[unlikely]] {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    const auto ixde = reinterpret_cast<PFN_INITIALIZE_XAML_DIAGNOSTICS_EX>(
+        GetProcAddress(wux, "InitializeXamlDiagnosticsEx"));
+    if (!ixde) [[unlikely]] {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    const HRESULT hr2 = ixde(L"VisualDiagConnection1", pid, nullptr, location,
+                             CLSID_ExplorerTAP, nullptr);
+    if (FAILED(hr2)) [[unlikely]] {
+        return hr2;
+    }
+
+    return S_OK;
 }
