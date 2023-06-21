@@ -257,27 +257,10 @@ void CMainDlg::ElementAdded(const ParentChildRelation& parentChildRelation,
         }
     }
 
-    bool selectedItemVisible = false;
-
-    auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
-    auto selectedItem = treeView.GetSelectedItem();
-    if (selectedItem && IsTreeItemInView(selectedItem)) {
-        selectedItemVisible = true;
-    }
-
-    if (!m_redrawTreeQueued) {
-        treeView.SetRedraw(FALSE);
-        SetTimer(TIMER_ID_REDRAW_TREE, kRedrawTreeDelay);
-        m_redrawTreeQueued = true;
-    }
+    RedrawTreeQueue();
 
     AddItemToTree(parentItem, insertAfter, element.Handle,
                   &itElementItem->second);
-
-    // Make sure the selected item remains visible.
-    if (selectedItem && selectedItemVisible) {
-        selectedItem.EnsureVisible();
-    }
 }
 
 void CMainDlg::ElementRemoved(InstanceHandle handle) {
@@ -290,21 +273,11 @@ void CMainDlg::ElementRemoved(InstanceHandle handle) {
         return;
     }
 
-    bool selectedItemVisible = false;
-
-    auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
-    auto selectedItem = treeView.GetSelectedItem();
-    if (selectedItem && IsTreeItemInView(selectedItem)) {
-        selectedItemVisible = true;
-    }
-
-    if (!m_redrawTreeQueued) {
-        treeView.SetRedraw(FALSE);
-        SetTimer(TIMER_ID_REDRAW_TREE, kRedrawTreeDelay);
-        m_redrawTreeQueued = true;
-    }
-
     if (it->second.treeItem) {
+        RedrawTreeQueue();
+
+        auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+
         bool deleted = treeView.DeleteItem(it->second.treeItem);
         ATLASSERT(deleted);
 
@@ -331,11 +304,6 @@ void CMainDlg::ElementRemoved(InstanceHandle handle) {
         };
 
         clearTreeItemRecursive(handle, &it->second);
-    }
-
-    // Make sure the selected item remains visible.
-    if (selectedItem && selectedItemVisible) {
-        selectedItem.EnsureVisible();
     }
 
     auto itChildrenOfParent = m_parentToChildren.find(it->second.parentHandle);
@@ -416,6 +384,16 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
 
             auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
             treeView.SetRedraw(TRUE);
+
+            // Make sure the selected item remains visible.
+            if (m_redrawTreeQueuedEnsureSelectionVisible) {
+                auto selectedItem = treeView.GetSelectedItem();
+                if (selectedItem) {
+                    selectedItem.EnsureVisible();
+                }
+
+                m_redrawTreeQueuedEnsureSelectionVisible = false;
+            }
             break;
         }
     }
@@ -865,6 +843,22 @@ LRESULT CMainDlg::OnActivateWindow(UINT uMsg, WPARAM wParam, LPARAM lParam) {
     Show();
     ::SetForegroundWindow(m_hWnd);
     return 0;
+}
+
+void CMainDlg::RedrawTreeQueue() {
+    if (m_redrawTreeQueued) {
+        return;
+    }
+
+    auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+
+    auto selectedItem = treeView.GetSelectedItem();
+    m_redrawTreeQueuedEnsureSelectionVisible =
+        selectedItem && IsTreeItemInView(selectedItem);
+
+    treeView.SetRedraw(FALSE);
+    SetTimer(TIMER_ID_REDRAW_TREE, kRedrawTreeDelay);
+    m_redrawTreeQueued = true;
 }
 
 bool CMainDlg::SetSelectedElementInformation() {

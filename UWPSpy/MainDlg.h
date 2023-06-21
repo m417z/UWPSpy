@@ -132,6 +132,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnCancel(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnActivateWindow(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
+    void RedrawTreeQueue();
     bool SetSelectedElementInformation();
     void ResetAttributesListColumns();
     void PopulateAttributesList(InstanceHandle handle);
@@ -150,6 +151,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     bool m_splitModeAttributesExpanded = false;
     bool m_registeredHotkeySelectElementFromCursor = false;
     bool m_redrawTreeQueued = false;
+    bool m_redrawTreeQueuedEnsureSelectionVisible = false;
 
     winrt::com_ptr<IVisualTreeService3> m_visualTreeService;
     winrt::com_ptr<IXamlDiagnostics> m_xamlDiagnostics;
