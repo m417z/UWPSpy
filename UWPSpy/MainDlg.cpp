@@ -35,6 +35,15 @@ bool IsTreeItemInView(CTreeItem treeItem) {
     return intercectionRect.IntersectRect(rect, clientRect);
 }
 
+// https://stackoverflow.com/a/35277401
+void ListViewSetTopIndex(CListViewCtrl listView, int index) {
+    CSize itemSpacing;
+    listView.GetItemSpacing(itemSpacing, TRUE);
+
+    CSize scrollsize(0, (index - listView.GetTopIndex()) * itemSpacing.cy);
+    listView.Scroll(scrollsize);
+}
+
 // https://stackoverflow.com/a/41088729
 int GetRequiredComboDroppedWidth(CComboBox rCombo) {
     CString str;
@@ -623,6 +632,52 @@ void CMainDlg::OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl) {
     ResizeClient(rectDlg.right, rectDlg.bottom);
 }
 
+LRESULT CMainDlg::OnAttributeListDblClk(LPNMHDR pnmh) {
+    auto itemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pnmh);
+    if (itemActivate->iItem == -1 ||
+        (itemActivate->iSubItem != 0 && itemActivate->iSubItem != 1)) {
+        return 0;
+    }
+
+    auto attributesList = CListViewCtrl(pnmh->hwndFrom);
+
+    if (itemActivate->iSubItem == 0) {
+        unsigned int clickedPropertyIndex = static_cast<unsigned int>(
+            attributesList.GetItemData(itemActivate->iItem));
+
+        auto propertiesComboBox = CComboBox(GetDlgItem(IDC_PROPERTY_NAME));
+        int index = CB_ERR;
+
+        int propertiesCount = propertiesComboBox.GetCount();
+        for (int i = 0; i < propertiesCount; i++) {
+            unsigned int propertyIndex =
+                static_cast<unsigned int>(propertiesComboBox.GetItemData(i));
+            if (propertyIndex == clickedPropertyIndex) {
+                index = i;
+                break;
+            }
+        }
+
+        if (index != CB_ERR) {
+            propertiesComboBox.SetCurSel(index);
+            propertiesComboBox.GetLBText(index, m_lastPropertySelection);
+        }
+    } else if (itemActivate->iSubItem == 1) {
+        bool valueShownAsIs =
+            (attributesList.GetItemData(itemActivate->iItem) >> 32) & 1;
+        if (valueShownAsIs) {
+            CString itemValue;
+            attributesList.GetItemText(itemActivate->iItem,
+                                       itemActivate->iSubItem, itemValue);
+
+            auto propertyValueEdit = CEdit(GetDlgItem(IDC_PROPERTY_VALUE));
+            propertyValueEdit.SetWindowText(itemValue);
+        }
+    }
+
+    return 0;
+}
+
 void CMainDlg::OnPropertyNameSelChange(UINT uNotifyCode,
                                        int nID,
                                        CWindow wndCtl) {
@@ -659,7 +714,12 @@ void CMainDlg::OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl) {
         return;
     }
 
+    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    int attributesListTopIndex = attributesList.GetTopIndex();
+
     SetSelectedElementInformation();
+
+    ListViewSetTopIndex(attributesList, attributesListTopIndex);
 }
 
 void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
@@ -720,7 +780,12 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
         return;
     }
 
+    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    int attributesListTopIndex = attributesList.GetTopIndex();
+
     SetSelectedElementInformation();
+
+    ListViewSetTopIndex(attributesList, attributesListTopIndex);
 }
 
 void CMainDlg::OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl) {
@@ -1033,9 +1098,11 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
         }
 
         std::wstring value;
+        bool valueShownAsIs = false;
 
         if (m_detailedProperties) {
             value = v.Value;
+            valueShownAsIs = true;
         } else if (v.MetadataBits & IsValueNull) {
             value = L"(null)";
         } else if (v.MetadataBits & IsValueHandle) {
@@ -1061,6 +1128,7 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
                 className);
         } else {
             value = v.Value;
+            valueShownAsIs = true;
         }
 
         int c = 0;
@@ -1081,6 +1149,14 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
             attributesList.AddItem(row, c++,
                                    sourceToString(src.Source).c_str());
         }
+
+        // Passes on 64-bit, not on 32-bit. Can be fixed later if a 32-bit build
+        // is needed.
+        static_assert(sizeof(DWORD_PTR) >= sizeof(v.Index) + 1);
+        static_assert(sizeof(v.Index) == 4);
+        attributesList.SetItemData(
+            row,
+            (static_cast<DWORD_PTR>(valueShownAsIs ? 1 : 0) << 32) | v.Index);
 
         row++;
     }

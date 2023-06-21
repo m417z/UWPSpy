@@ -38,6 +38,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
                           OnElementTreeSelChaneged)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_KEYDOWN, OnElementTreeKeyDown)
         COMMAND_ID_HANDLER_EX(IDC_SPLIT_TOGGLE, OnSplitToggle)
+        NOTIFY_HANDLER_EX(IDC_ATTRIBUTE_LIST, NM_DBLCLK, OnAttributeListDblClk)
         COMMAND_HANDLER_EX(IDC_PROPERTY_NAME, CBN_SELCHANGE,
                            OnPropertyNameSelChange)
         COMMAND_ID_HANDLER_EX(IDC_PROPERTY_REMOVE, OnPropertyRemove)
@@ -119,6 +120,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     LRESULT OnElementTreeSelChaneged(LPNMHDR pnmh);
     LRESULT OnElementTreeKeyDown(LPNMHDR pnmh);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
+    LRESULT OnAttributeListDblClk(LPNMHDR pnmh);
     void OnPropertyNameSelChange(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl);
