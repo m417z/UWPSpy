@@ -13,6 +13,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     enum {
         TIMER_ID_REDRAW_TREE = 1,
+        TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION,
     };
 
     enum {
@@ -34,6 +35,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         MSG_WM_DESTROY(OnDestroy)
         MSG_WM_HOTKEY(OnHotKey)
         MSG_WM_TIMER(OnTimer)
+        MSG_WM_CONTEXTMENU(OnContextMenu)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_SELCHANGED,
                           OnElementTreeSelChaneged)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_KEYDOWN, OnElementTreeKeyDown)
@@ -117,6 +119,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnDestroy();
     void OnHotKey(int nHotKeyID, UINT uModifiers, UINT uVirtKey);
     void OnTimer(UINT_PTR nIDEvent);
+    void OnContextMenu(CWindow wnd, CPoint point);
     LRESULT OnElementTreeSelChaneged(LPNMHDR pnmh);
     LRESULT OnElementTreeKeyDown(LPNMHDR pnmh);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
@@ -134,6 +137,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     void RedrawTreeQueue();
     bool SetSelectedElementInformation();
+    bool RefreshSelectedElementInformation(UINT delay = 20);
     void ResetAttributesListColumns();
     void PopulateAttributesList(InstanceHandle handle);
     void AddItemToTree(HTREEITEM parentTreeItem,

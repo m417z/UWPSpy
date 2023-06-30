@@ -61,7 +61,8 @@ HRESULT WINAPI start(DWORD pid) {
     }
 
     WCHAR location[MAX_PATH];
-    switch (GetModuleFileName(_Module.m_hInst, location, ARRAYSIZE(location))) {
+    switch (GetModuleFileName(_Module.GetModuleInstance(), location,
+                              ARRAYSIZE(location))) {
         case 0:
         case ARRAYSIZE(location):
             return HRESULT_FROM_WIN32(GetLastError());

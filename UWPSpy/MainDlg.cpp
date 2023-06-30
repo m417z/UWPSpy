@@ -386,7 +386,7 @@ void CMainDlg::OnHotKey(int nHotKeyID, UINT uModifiers, UINT uVirtKey) {
 void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
     switch (nIDEvent) {
         case TIMER_ID_REDRAW_TREE: {
-            KillTimer(TIMER_ID_REDRAW_TREE);
+            KillTimer(nIDEvent);
             m_redrawTreeQueued = false;
 
             auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
@@ -403,6 +403,83 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
             }
             break;
         }
+
+        case TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION:
+            KillTimer(nIDEvent);
+            RefreshSelectedElementInformation(0);
+            break;
+    }
+}
+
+void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
+    auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+    if (wnd != treeView) {
+        return;
+    }
+
+    CTreeItem targetItem;
+
+    if (point.x == -1 && point.y == -1) {
+        // Keyboard context menu.
+        targetItem = treeView.GetSelectedItem();
+    } else {
+        CPoint mappedPoint = point;
+        treeView.ScreenToClient(&mappedPoint);
+
+        targetItem = treeView.HitTest(mappedPoint, nullptr);
+    }
+
+    if (!targetItem) {
+        return;
+    }
+
+    CPoint menuPoint = point;
+    if (menuPoint.x == -1 && menuPoint.y == -1) {
+        // Keyboard context menu.
+        CRect rect;
+        if (targetItem.GetRect(rect, FALSE)) {
+            menuPoint = rect.CenterPoint();
+            treeView.ClientToScreen(&menuPoint);
+        } else {
+            ::GetCursorPos(&menuPoint);
+        }
+    }
+
+    CMenu menu;
+    menu.CreatePopupMenu();
+
+    enum {
+        MENU_ID_VISIBLE = 1,
+    };
+
+    auto handle = static_cast<InstanceHandle>(targetItem.GetData());
+
+    wf::IInspectable element;
+    HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
+        handle, reinterpret_cast<::IInspectable**>(winrt::put_abi(element)));
+    if (FAILED(hr) || !element) {
+        return;
+    }
+
+    auto uiElement = element.try_as<wux::UIElement>();
+    if (!uiElement) {
+        return;
+    }
+
+    bool visible = uiElement.Visibility() == wux::Visibility::Visible;
+
+    menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0), MENU_ID_VISIBLE,
+                    L"Visible");
+
+    int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD, menuPoint.x,
+                                   menuPoint.y, m_hWnd);
+    switch (nCmd) {
+        case MENU_ID_VISIBLE:
+            uiElement.Visibility(visible ? wux::Visibility::Collapsed
+                                         : wux::Visibility::Visible);
+
+            RefreshSelectedElementInformation();
+            break;
     }
 }
 
@@ -566,7 +643,7 @@ bool CMainDlg::CreateFlashArea(InstanceHandle handle) {
         return true;
     }
 
-    m_flashAreaWindow = FlashArea(m_hWnd, _Module.m_hInst, rect);
+    m_flashAreaWindow = FlashArea(m_hWnd, _Module.GetModuleInstance(), rect);
     if (!m_flashAreaWindow) {
         return false;
     }
@@ -699,12 +776,7 @@ void CMainDlg::OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl) {
         return;
     }
 
-    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
-    int attributesListTopIndex = attributesList.GetTopIndex();
-
-    SetSelectedElementInformation();
-
-    ListViewSetTopIndex(attributesList, attributesListTopIndex);
+    RefreshSelectedElementInformation();
 }
 
 void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
@@ -765,12 +837,7 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
         return;
     }
 
-    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
-    int attributesListTopIndex = attributesList.GetTopIndex();
-
-    SetSelectedElementInformation();
-
-    ListViewSetTopIndex(attributesList, attributesListTopIndex);
+    RefreshSelectedElementInformation();
 }
 
 void CMainDlg::OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl) {
@@ -904,6 +971,8 @@ void CMainDlg::RedrawTreeQueue() {
 }
 
 bool CMainDlg::SetSelectedElementInformation() {
+    KillTimer(TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION);
+
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
     auto selectedItem = treeView.GetSelectedItem();
     if (!selectedItem) {
@@ -978,6 +1047,25 @@ bool CMainDlg::SetSelectedElementInformation() {
         CreateFlashArea(handle);
     }
 
+    return true;
+}
+
+bool CMainDlg::RefreshSelectedElementInformation(UINT delay) {
+    // Use a delay since some information is not available immediately after
+    // changing properties, such as the new element position and size.
+    if (delay > 0) {
+        SetTimer(TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION, delay);
+        return true;
+    }
+
+    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    int attributesListTopIndex = attributesList.GetTopIndex();
+
+    if (!SetSelectedElementInformation()) {
+        return false;
+    }
+
+    ListViewSetTopIndex(attributesList, attributesListTopIndex);
     return true;
 }
 
