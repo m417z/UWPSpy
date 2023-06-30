@@ -3,6 +3,7 @@
 #include "MainDlg.h"
 
 #include "flash_area.h"
+#include "version.h"
 
 namespace {
 
@@ -927,7 +928,7 @@ void CMainDlg::OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl) {
         .dwFlags = TDF_ENABLE_HYPERLINKS | TDF_ALLOW_DIALOG_CANCELLATION,
         .pszWindowTitle = L"About",
         .pszMainIcon = MAKEINTRESOURCE(IDR_MAINFRAME),
-        .pszMainInstruction = L"UWPSpy",  // "v" VER_FILE_VERSION_WSTR,
+        .pszMainInstruction = L"UWPSpy v" VER_FILE_VERSION_WSTR,
         .pszContent = content,
         .pfCallback = [](HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
                          LONG_PTR lpRefData) -> HRESULT {

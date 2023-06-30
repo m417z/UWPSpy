@@ -62,6 +62,9 @@
     <ClInclude Include="flash_area.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="UWPSpy.rc">
@@ -77,6 +80,9 @@
   <ItemGroup>
     <None Include="_exports.def">
       <Filter>Source Files</Filter>
+    </None>
+    <None Include="UWPSpy.rc2">
+      <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
 </Project>
