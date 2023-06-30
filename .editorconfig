@@ -1,0 +1,6 @@
+# Top-most EditorConfig file
+root = true
+
+# Set default charset (what year is it?!)
+[*.{c,cpp,h}]
+charset = utf-8
