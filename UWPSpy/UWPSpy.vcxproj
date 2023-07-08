@@ -219,6 +219,7 @@
     </Midl>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AboutDlg.cpp" />
     <ClCompile Include="flash_area.cpp" />
     <ClCompile Include="MainDlg.cpp" />
     <ClCompile Include="module.cpp" />
@@ -233,13 +234,15 @@
     <ClCompile Include="visualtreewatcher.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\common\version.h" />
+    <ClInclude Include="AboutDlg.h" />
     <ClInclude Include="flash_area.h" />
     <ClInclude Include="MainDlg.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="simplefactory.hpp" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="tap.hpp" />
-    <ClInclude Include="version.h" />
+    <ClInclude Include="targetver.h" />
     <ClInclude Include="visualtreewatcher.hpp" />
     <ClInclude Include="winrt.hpp" />
   </ItemGroup>

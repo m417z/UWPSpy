@@ -1,5 +1,7 @@
 #pragma once
 
+#include "targetver.h"
+
 // STL
 
 #include <algorithm>
@@ -12,10 +14,8 @@
 
 // WTL
 
-#define NTDDI_VERSION NTDDI_WIN10_RS5
-#include <sdkddkver.h>
-
 #define WIN32_LEAN_AND_MEAN  // Exclude rarely-used stuff from Windows headers
+#define NOMINMAX
 #define _WTL_NO_CSTRING
 #define _WTL_NO_WTYPES
 #define _WTL_NO_UNION_CLASSES
@@ -38,17 +38,17 @@ extern CAppModule _Module;
 
 // Windows
 
-#include <CoreWindow.h>
-#include <Unknwn.h>
 #include <appmodel.h>
 #include <combaseapi.h>
 #include <comdef.h>
+#include <corewindow.h>
 #include <guiddef.h>
 #include <libloaderapi.h>
 #include <ocidl.h>
+#include <unknwn.h>
 #include <wincodec.h>
 #include <windows.ui.xaml.hosting.desktopwindowxamlsource.h>
-#include <xamlOM.h>
+#include <xamlom.h>
 
 // C++/WinRT
 

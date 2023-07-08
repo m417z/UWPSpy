@@ -2,8 +2,8 @@
 
 #include "MainDlg.h"
 
+#include "AboutDlg.h"
 #include "flash_area.h"
-#include "version.h"
 
 namespace {
 
@@ -155,13 +155,6 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
     }
 
     return std::nullopt;
-}
-
-void OpenUrl(HWND hWnd, PCWSTR url) {
-    if ((INT_PTR)ShellExecute(hWnd, L"open", url, nullptr, nullptr,
-                              SW_SHOWNORMAL) <= 32) {
-        MessageBox(hWnd, L"Failed to open link", nullptr, MB_ICONHAND);
-    }
 }
 
 }  // namespace
@@ -329,14 +322,14 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     CenterWindow();
 
     // Set icons.
-    HICON hIcon = AtlLoadIconImage(IDR_MAINFRAME, LR_DEFAULTCOLOR,
-                                   ::GetSystemMetrics(SM_CXICON),
-                                   ::GetSystemMetrics(SM_CYICON));
-    SetIcon(hIcon, TRUE);
-    HICON hIconSmall = AtlLoadIconImage(IDR_MAINFRAME, LR_DEFAULTCOLOR,
-                                        ::GetSystemMetrics(SM_CXSMICON),
-                                        ::GetSystemMetrics(SM_CYSMICON));
-    SetIcon(hIconSmall, FALSE);
+    m_icon = AtlLoadIconImage(IDR_MAINFRAME, LR_DEFAULTCOLOR,
+                              ::GetSystemMetrics(SM_CXICON),
+                              ::GetSystemMetrics(SM_CYICON));
+    SetIcon(m_icon, TRUE);
+    m_smallIcon = AtlLoadIconImage(IDR_MAINFRAME, LR_DEFAULTCOLOR,
+                                   ::GetSystemMetrics(SM_CXSMICON),
+                                   ::GetSystemMetrics(SM_CYSMICON));
+    SetIcon(m_smallIcon, FALSE);
 
     // Init resizing.
     DlgResize_Init();
@@ -906,43 +899,8 @@ void CMainDlg::OnDetailedProperties(UINT uNotifyCode, int nID, CWindow wndCtl) {
 }
 
 void CMainDlg::OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl) {
-    PCWSTR content =
-        L"By <A HREF=\"https://ramensoftware.com/\">Ramen Software</A>\n"
-        L"\n"
-        L"<A HREF=\"https://ramensoftware.com/uwpspy\">Web page</a>\n"
-        L"<A HREF=\"https://github.com/m417z/UWPSpy\">Source code</a>\n"
-        L"\n"
-        L"Tips:\n"
-        L"• When focused on the element tree, place your mouse cursor over a "
-        L"UWP element and press Ctrl+Shift+C to select it in the tree.\n"
-        L"• To have a good overview of an element's surroundings, collapse all "
-        L"tree elements, select the desired element with the previous tip, and "
-        L"go up the element tree.\n"
-        L"• Double-click property list entries to copy the data to the form "
-        L"below.";
-
-    TASKDIALOGCONFIG taskDialogConfig{
-        .cbSize = sizeof(taskDialogConfig),
-        .hwndParent = m_hWnd,
-        .hInstance = _Module.GetModuleInstance(),
-        .dwFlags = TDF_ENABLE_HYPERLINKS | TDF_ALLOW_DIALOG_CANCELLATION,
-        .pszWindowTitle = L"About",
-        .pszMainIcon = MAKEINTRESOURCE(IDR_MAINFRAME),
-        .pszMainInstruction = L"UWPSpy v" VER_FILE_VERSION_WSTR,
-        .pszContent = content,
-        .pfCallback = [](HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
-                         LONG_PTR lpRefData) -> HRESULT {
-            switch (msg) {
-                case TDN_HYPERLINK_CLICKED:
-                    OpenUrl(hwnd, (PCWSTR)lParam);
-                    break;
-            }
-
-            return S_OK;
-        },
-    };
-
-    ::TaskDialogIndirect(&taskDialogConfig, nullptr, nullptr, nullptr);
+    CAboutDlg dlgAbout;
+    dlgAbout.DoModal(m_hWnd);
 }
 
 void CMainDlg::OnCancel(UINT uNotifyCode, int nID, CWindow wndCtl) {

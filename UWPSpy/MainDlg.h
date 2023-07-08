@@ -150,6 +150,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void DestroyFlashArea();
     bool SelectElementFromCursor();
 
+    CIcon m_icon, m_smallIcon;
     bool m_highlightSelection = true;
     bool m_detailedProperties = false;
     bool m_splitModeAttributesExpanded = false;
