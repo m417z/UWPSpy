@@ -11,7 +11,12 @@ namespace {
 void OpenUrl(HWND hWnd, PCWSTR url) {
     if ((INT_PTR)ShellExecute(hWnd, L"open", url, nullptr, nullptr,
                               SW_SHOWNORMAL) <= 32) {
-        MessageBox(hWnd, L"Failed to open link", nullptr, MB_ICONHAND);
+        CString errorMsg;
+        errorMsg.Format(
+            L"Failed to open link, you can copy it with Ctrl+C and open it in "
+            L"a browser manually:\n\n%s",
+            url);
+        MessageBox(hWnd, errorMsg, nullptr, MB_ICONHAND);
     }
 }
 
@@ -20,13 +25,9 @@ void OpenUrl(HWND hWnd, PCWSTR url) {
 BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     CenterWindow();
 
-    m_icon = AtlLoadIconImage(IDR_MAINFRAME, LR_DEFAULTCOLOR,
-                              ::GetSystemMetrics(SM_CXICON),
-                              ::GetSystemMetrics(SM_CYICON));
+    m_icon.LoadIconMetric(IDR_MAINFRAME, LIM_LARGE);
     SetIcon(m_icon, TRUE);
-    m_smallIcon = AtlLoadIconImage(IDR_MAINFRAME, LR_DEFAULTCOLOR,
-                                   ::GetSystemMetrics(SM_CXSMICON),
-                                   ::GetSystemMetrics(SM_CYSMICON));
+    m_smallIcon.LoadIconMetric(IDR_MAINFRAME, LIM_SMALL);
     SetIcon(m_smallIcon, FALSE);
 
     DlgResize_Init();

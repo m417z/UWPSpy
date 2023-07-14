@@ -9,7 +9,12 @@ namespace {
 void OpenUrl(HWND hWnd, PCWSTR url) {
     if ((INT_PTR)ShellExecute(hWnd, L"open", url, nullptr, nullptr,
                               SW_SHOWNORMAL) <= 32) {
-        MessageBox(hWnd, L"Failed to open link", nullptr, MB_ICONHAND);
+        CString errorMsg;
+        errorMsg.Format(
+            L"Failed to open link, you can copy it with Ctrl+C and open it in "
+            L"a browser manually:\n\n%s",
+            url);
+        MessageBox(hWnd, errorMsg, nullptr, MB_ICONHAND);
     }
 }
 
