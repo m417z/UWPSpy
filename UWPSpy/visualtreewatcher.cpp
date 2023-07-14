@@ -62,7 +62,24 @@ VisualTreeWatcher::VisualTreeWatcher(winrt::com_ptr<IUnknown> site)
         ATLTRACE(_T("Main dialog creation failed!\n"));
     }
 
-    winrt::check_hresult(treeService->AdviseVisualTreeChange(this));
+    // winrt::check_hresult(treeService->AdviseVisualTreeChange(this));
+
+    // Calling AdviseVisualTreeChange from the current thread causes the app to
+    // hang on Windows 10 in Advising::RunOnUIThread. Creating a new thread and
+    // calling it from there fixes it.
+    HANDLE thread = CreateThread(
+        nullptr, 0,
+        [](LPVOID lpParam) -> DWORD {
+            auto watcher = reinterpret_cast<VisualTreeWatcher*>(lpParam);
+            const auto treeService =
+                watcher->m_xamlDiagnostics.as<IVisualTreeService3>();
+            winrt::check_hresult(treeService->AdviseVisualTreeChange(watcher));
+            return 0;
+        },
+        this, 0, nullptr);
+    if (thread) {
+        CloseHandle(thread);
+    }
 }
 
 void VisualTreeWatcher::Activate() {
