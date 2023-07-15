@@ -159,10 +159,12 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
 
 }  // namespace
 
-CMainDlg::CMainDlg(winrt::com_ptr<IVisualTreeService3> service,
-                   winrt::com_ptr<IXamlDiagnostics> diagnostics)
-    : m_visualTreeService(std::move(service)),
-      m_xamlDiagnostics(std::move(diagnostics)) {}
+CMainDlg::CMainDlg(winrt::com_ptr<IXamlDiagnostics> diagnostics,
+                   void* callbacksParam)
+    : m_elementTree(this, 1),
+      m_visualTreeService(diagnostics.as<IVisualTreeService3>()),
+      m_xamlDiagnostics(std::move(diagnostics)),
+      m_callbacksParam(callbacksParam) {}
 
 void CMainDlg::Hide() {
     ShowWindow(SW_HIDE);
@@ -317,6 +319,10 @@ void CMainDlg::ElementRemoved(InstanceHandle handle) {
     m_elementItems.erase(it);
 }
 
+void CMainDlg::SetOnFinalMessageCallback(OnFinalMessageCallback_t callback) {
+    m_onFinalMessageCallback = callback;
+}
+
 BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     // Center the dialog on the screen.
     CenterWindow();
@@ -335,10 +341,12 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     DlgResize_Init();
 
     // Init UI elements.
-    SetWindowText(
-        std::format(L"UWPSpy - PID: {}", GetCurrentProcessId()).c_str());
+    SetWindowText(std::format(L"UWPSpy - PID: {} TID: {}",
+                              GetCurrentProcessId(), GetCurrentThreadId())
+                      .c_str());
 
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+    m_elementTree.SubclassWindow(treeView);
     treeView.SetExtendedStyle(TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
     ::SetWindowTheme(treeView, L"Explorer", nullptr);
 
@@ -354,26 +362,15 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     CButton(GetDlgItem(IDC_DETAILED_PROPERTIES))
         .SetCheck(m_detailedProperties ? BST_CHECKED : BST_UNCHECKED);
 
-    // Register hotkeys.
-    m_registeredHotkeySelectElementFromCursor =
-        ::RegisterHotKey(m_hWnd, HOTKEY_SELECT_ELEMENT_FROM_CURSOR,
-                         MOD_CONTROL | MOD_SHIFT, 'C');
-
     return TRUE;
 }
 
-void CMainDlg::OnDestroy() {
-    if (m_registeredHotkeySelectElementFromCursor) {
-        ::UnregisterHotKey(m_hWnd, HOTKEY_SELECT_ELEMENT_FROM_CURSOR);
-        m_registeredHotkeySelectElementFromCursor = false;
-    }
-}
+void CMainDlg::OnDestroy() {}
 
-void CMainDlg::OnHotKey(int nHotKeyID, UINT uModifiers, UINT uVirtKey) {
-    switch (nHotKeyID) {
-        case HOTKEY_SELECT_ELEMENT_FROM_CURSOR:
-            SelectElementFromCursor();
-            break;
+void CMainDlg::OnFinalMessage(HWND hWnd) {
+    auto onFinalMessageCallback = *m_onFinalMessageCallback;
+    if (onFinalMessageCallback) {
+        onFinalMessageCallback(m_callbacksParam, hWnd);
     }
 }
 
@@ -448,32 +445,36 @@ void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
 
     auto handle = static_cast<InstanceHandle>(targetItem.GetData());
 
-    wf::IInspectable element;
-    HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
-        handle, reinterpret_cast<::IInspectable**>(winrt::put_abi(element)));
-    if (FAILED(hr) || !element) {
-        return;
-    }
+    try {
+        wf::IInspectable element;
+        winrt::check_hresult(m_xamlDiagnostics->GetIInspectableFromHandle(
+            handle,
+            reinterpret_cast<::IInspectable**>(winrt::put_abi(element))));
 
-    auto uiElement = element.try_as<wux::UIElement>();
-    if (!uiElement) {
-        return;
-    }
+        auto uiElement = element.try_as<wux::UIElement>();
+        if (!uiElement) {
+            return;
+        }
 
-    bool visible = uiElement.Visibility() == wux::Visibility::Visible;
+        bool visible = uiElement.Visibility() == wux::Visibility::Visible;
 
-    menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0), MENU_ID_VISIBLE,
-                    L"Visible");
+        menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0), MENU_ID_VISIBLE,
+                        L"Visible");
 
-    int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD, menuPoint.x,
-                                   menuPoint.y, m_hWnd);
-    switch (nCmd) {
-        case MENU_ID_VISIBLE:
-            uiElement.Visibility(visible ? wux::Visibility::Collapsed
-                                         : wux::Visibility::Visible);
+        int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD,
+                                       menuPoint.x, menuPoint.y, m_hWnd);
+        switch (nCmd) {
+            case MENU_ID_VISIBLE:
+                uiElement.Visibility(visible ? wux::Visibility::Collapsed
+                                             : wux::Visibility::Visible);
 
-            RefreshSelectedElementInformation();
-            break;
+                RefreshSelectedElementInformation();
+                break;
+        }
+    } catch (...) {
+        HRESULT hr = winrt::to_hresult();
+        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        MessageBox(errorMsg.c_str(), L"Error");
     }
 }
 
@@ -653,20 +654,6 @@ void CMainDlg::DestroyFlashArea() {
 
 LRESULT CMainDlg::OnElementTreeSelChaneged(LPNMHDR pnmh) {
     SetSelectedElementInformation();
-
-    return 0;
-}
-
-LRESULT CMainDlg::OnElementTreeKeyDown(LPNMHDR pnmh) {
-    auto wVKey = reinterpret_cast<LPNMTVKEYDOWN>(pnmh)->wVKey;
-
-    // Ctrl+Shift+C is registered as a hotkey, this is a fallback in case that
-    // fails. It seems that UWP sandboxed apps are not allowed to register
-    // hotkeys.
-    if (wVKey == 'C' && GetKeyState(VK_CONTROL) < 0 &&
-        GetKeyState(VK_SHIFT) < 0) {
-        SelectElementFromCursor();
-    }
 
     return 0;
 }
@@ -911,6 +898,20 @@ LRESULT CMainDlg::OnActivateWindow(UINT uMsg, WPARAM wParam, LPARAM lParam) {
     Show();
     ::SetForegroundWindow(m_hWnd);
     return 0;
+}
+
+LRESULT CMainDlg::OnDestroyWindow(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    DestroyWindow();
+    return 0;
+}
+
+void CMainDlg::ElementTreeOnChar(TCHAR chChar, UINT nRepCnt, UINT nFlags) {
+    if (chChar == 4) {
+        // Ctrl+D.
+        SelectElementFromCursor();
+    } else {
+        SetMsgHandled(FALSE);
+    }
 }
 
 void CMainDlg::RedrawTreeQueue() {

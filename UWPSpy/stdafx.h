@@ -8,6 +8,7 @@
 #include <format>
 #include <functional>
 #include <optional>
+#include <shared_mutex>
 #include <string_view>
 #include <unordered_map>
 #include <vector>

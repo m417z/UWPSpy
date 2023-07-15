@@ -37,6 +37,11 @@ struct VisualTreeWatcher : winrt::implements<VisualTreeWatcher,
         return obj.as<T>();
     }
 
+    CMainDlg* DlgMainForCurrentThread();
+    void OnDlgMainFinalMessage(HWND hWnd);
+
     winrt::com_ptr<IXamlDiagnostics> m_xamlDiagnostics;
-    std::optional<CMainDlg> m_dlgMain;
+
+    std::shared_mutex m_dlgMainMutex;
+    std::unordered_map<DWORD, CMainDlg> m_dlgMainForEachThread;
 };

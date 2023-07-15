@@ -2,7 +2,7 @@
 
 #include "visualtreewatcher.hpp"
 
-#define EXTRA_DEBUG 1
+#define EXTRA_DEBUG 0
 
 namespace {
 
@@ -32,36 +32,7 @@ ULONG_PTR EnableVisualStyles() {
 
 VisualTreeWatcher::VisualTreeWatcher(winrt::com_ptr<IUnknown> site)
     : m_xamlDiagnostics(site.as<IXamlDiagnostics>()) {
-    const auto treeService = m_xamlDiagnostics.as<IVisualTreeService3>();
-
-    HWND hChildWnd = nullptr;
-
-    UINT32 length = 0;
-    if (GetCurrentPackageFullName(&length, nullptr) !=
-        APPMODEL_ERROR_NO_PACKAGE) {
-        // Packaged UWP processes seem to lack visual styles, which causes
-        // artifacts such as black squares and UI flickering. This call fixes
-        // it.
-        EnableVisualStyles();
-
-        // Creating a dialog without a parent causes it to be occluded. Using
-        // the core window as a parent window fixes it.
-        if (const auto coreInterop =
-                winrt::Windows::UI::Core::CoreWindow::GetForCurrentThread()
-                    .try_as<ICoreWindowInterop>()) {
-            coreInterop->get_WindowHandle(&hChildWnd);
-        }
-    }
-
-    m_dlgMain.emplace(treeService, m_xamlDiagnostics);
-
-    if (m_dlgMain->Create(hChildWnd)) {
-        m_dlgMain->ShowWindow(SW_SHOWDEFAULT);
-        SetForegroundWindow(m_dlgMain->m_hWnd);
-    } else {
-        ATLTRACE(_T("Main dialog creation failed!\n"));
-    }
-
+    // const auto treeService = m_xamlDiagnostics.as<IVisualTreeService3>();
     // winrt::check_hresult(treeService->AdviseVisualTreeChange(this));
 
     // Calling AdviseVisualTreeChange from the current thread causes the app to
@@ -83,14 +54,19 @@ VisualTreeWatcher::VisualTreeWatcher(winrt::com_ptr<IUnknown> site)
 }
 
 void VisualTreeWatcher::Activate() {
-    ATLASSERT(m_dlgMain && *m_dlgMain);
-    m_dlgMain->Show();
-    SetForegroundWindow(m_dlgMain->m_hWnd);
+    std::shared_lock lock(m_dlgMainMutex);
+
+    for (auto& [threadId, dlgMain] : m_dlgMainForEachThread) {
+        dlgMain.PostMessage(CMainDlg::UWM_ACTIVATE_WINDOW);
+    }
 }
 
 VisualTreeWatcher::~VisualTreeWatcher() {
-    ATLASSERT(m_dlgMain && *m_dlgMain);
-    m_dlgMain->DestroyWindow();
+    std::shared_lock lock(m_dlgMainMutex);
+
+    for (auto& [threadId, dlgMain] : m_dlgMainForEachThread) {
+        dlgMain.SendMessage(CMainDlg::UWM_DESTROY_WINDOW);
+    }
 }
 
 HRESULT VisualTreeWatcher::OnVisualTreeChange(
@@ -98,91 +74,104 @@ HRESULT VisualTreeWatcher::OnVisualTreeChange(
     VisualElement element,
     VisualMutationType mutationType) try {
 #if EXTRA_DEBUG
-    WCHAR szBuffer[1025];
-    OutputDebugString(L"========================================\n");
+    try {
+        WCHAR szBuffer[1025];
+        OutputDebugString(L"========================================\n");
 
-    wsprintf(szBuffer, L"Parent: %p\n", (void*)parentChildRelation.Parent);
-    OutputDebugString(szBuffer);
-    wsprintf(szBuffer, L"Child: %p\n", (void*)parentChildRelation.Child);
-    OutputDebugString(szBuffer);
-    wsprintf(szBuffer, L"Child index: %u\n", parentChildRelation.ChildIndex);
-    OutputDebugString(szBuffer);
-    wsprintf(szBuffer, L"Handle: %p\n", (void*)element.Handle);
-    OutputDebugString(szBuffer);
-    wsprintf(szBuffer, L"Type: %s\n", element.Type);
-    OutputDebugString(szBuffer);
-    wsprintf(szBuffer, L"Name: %s\n", element.Name);
-    OutputDebugString(szBuffer);
-    wsprintf(szBuffer, L"NumChildren: %u\n", element.NumChildren);
-    OutputDebugString(szBuffer);
-    OutputDebugString(L"~~~~~~~~~~\n");
-
-    switch (mutationType) {
-        case Add:
-            OutputDebugString(L"Mutation type: Add\n");
-            break;
-
-        case Remove:
-            OutputDebugString(L"Mutation type: Remove\n");
-            break;
-
-        default:
-            wsprintf(szBuffer, L"Mutation type: %d\n",
-                     static_cast<int>(mutationType));
-            OutputDebugString(szBuffer);
-            break;
-    }
-
-    const auto inspectable = FromHandle<wf::IInspectable>(element.Handle);
-    const auto frameworkElement = inspectable.try_as<wux::FrameworkElement>();
-    if (frameworkElement) {
-        wsprintf(szBuffer, L"FrameworkElement address: %p\n",
-                 winrt::get_abi(frameworkElement));
+        wsprintf(szBuffer, L"Parent: %p\n", (void*)parentChildRelation.Parent);
         OutputDebugString(szBuffer);
-        wsprintf(szBuffer, L"FrameworkElement class: %s\n",
-                 winrt::get_class_name(frameworkElement).c_str());
+        wsprintf(szBuffer, L"Child: %p\n", (void*)parentChildRelation.Child);
         OutputDebugString(szBuffer);
-        wsprintf(szBuffer, L"FrameworkElement name: %s\n",
-                 frameworkElement.Name().c_str());
+        wsprintf(szBuffer, L"Child index: %u\n",
+                 parentChildRelation.ChildIndex);
         OutputDebugString(szBuffer);
-    }
+        wsprintf(szBuffer, L"Handle: %p\n", (void*)element.Handle);
+        OutputDebugString(szBuffer);
+        wsprintf(szBuffer, L"Type: %s\n", element.Type);
+        OutputDebugString(szBuffer);
+        wsprintf(szBuffer, L"Name: %s\n", element.Name);
+        OutputDebugString(szBuffer);
+        wsprintf(szBuffer, L"NumChildren: %u\n", element.NumChildren);
+        OutputDebugString(szBuffer);
+        OutputDebugString(L"~~~~~~~~~~\n");
 
-    if (parentChildRelation.Parent) {
-        if (frameworkElement) {
-            wsprintf(szBuffer, L"Real parent address: %p\n",
-                     winrt::get_abi(
-                         frameworkElement.Parent().as<wf::IInspectable>()));
-            OutputDebugString(szBuffer);
+        switch (mutationType) {
+            case Add:
+                OutputDebugString(L"Mutation type: Add\n");
+                break;
+
+            case Remove:
+                OutputDebugString(L"Mutation type: Remove\n");
+                break;
+
+            default:
+                wsprintf(szBuffer, L"Mutation type: %d\n",
+                         static_cast<int>(mutationType));
+                OutputDebugString(szBuffer);
+                break;
         }
 
-        const auto inspectable =
-            FromHandle<wf::IInspectable>(parentChildRelation.Parent);
-        const auto frameworkElement =
-            inspectable.try_as<wux::FrameworkElement>();
+        wux::FrameworkElement frameworkElement = nullptr;
+
+        const auto inspectable = FromHandle<wf::IInspectable>(element.Handle);
+        frameworkElement = inspectable.try_as<wux::FrameworkElement>();
+
         if (frameworkElement) {
-            wsprintf(szBuffer, L"Parent FrameworkElement address: %p\n",
+            wsprintf(szBuffer, L"FrameworkElement address: %p\n",
                      winrt::get_abi(frameworkElement));
             OutputDebugString(szBuffer);
-            wsprintf(szBuffer, L"Parent FrameworkElement class: %s\n",
+            wsprintf(szBuffer, L"FrameworkElement class: %s\n",
                      winrt::get_class_name(frameworkElement).c_str());
             OutputDebugString(szBuffer);
-            wsprintf(szBuffer, L"Parent FrameworkElement name: %s\n",
+            wsprintf(szBuffer, L"FrameworkElement name: %s\n",
                      frameworkElement.Name().c_str());
             OutputDebugString(szBuffer);
         }
+
+        if (parentChildRelation.Parent) {
+            if (frameworkElement) {
+                wsprintf(szBuffer, L"Real parent address: %p\n",
+                         winrt::get_abi(
+                             frameworkElement.Parent().as<wf::IInspectable>()));
+                OutputDebugString(szBuffer);
+            }
+
+            const auto inspectable =
+                FromHandle<wf::IInspectable>(parentChildRelation.Parent);
+            const auto frameworkElement =
+                inspectable.try_as<wux::FrameworkElement>();
+            if (frameworkElement) {
+                wsprintf(szBuffer, L"Parent FrameworkElement address: %p\n",
+                         winrt::get_abi(frameworkElement));
+                OutputDebugString(szBuffer);
+                wsprintf(szBuffer, L"Parent FrameworkElement class: %s\n",
+                         winrt::get_class_name(frameworkElement).c_str());
+                OutputDebugString(szBuffer);
+                wsprintf(szBuffer, L"Parent FrameworkElement name: %s\n",
+                         frameworkElement.Name().c_str());
+                OutputDebugString(szBuffer);
+            }
+        }
+    } catch (...) {
+        HRESULT hr = winrt::to_hresult();
+        WCHAR szBuffer[1025];
+        wsprintf(szBuffer, L"Error %X\n", hr);
+        OutputDebugString(szBuffer);
     }
 #endif  // EXTRA_DEBUG
 
+    auto* dlgMain = DlgMainForCurrentThread();
+
     switch (mutationType) {
         case Add:
-            if (m_dlgMain && *m_dlgMain) {
-                m_dlgMain->ElementAdded(parentChildRelation, element);
+            if (dlgMain) {
+                dlgMain->ElementAdded(parentChildRelation, element);
             }
             break;
 
         case Remove:
-            if (m_dlgMain && *m_dlgMain) {
-                m_dlgMain->ElementRemoved(element.Handle);
+            if (dlgMain) {
+                dlgMain->ElementRemoved(element.Handle);
             }
             break;
 
@@ -194,11 +183,87 @@ HRESULT VisualTreeWatcher::OnVisualTreeChange(
     return S_OK;
 } catch (...) {
     ATLASSERT(FALSE);
-    return winrt::to_hresult();
+    // Returning an error prevents (some?) further messages, always return
+    // success.
+    // return winrt::to_hresult();
+    return S_OK;
 }
 
 HRESULT VisualTreeWatcher::OnElementStateChanged(InstanceHandle,
                                                  VisualElementState,
                                                  LPCWSTR) noexcept {
     return S_OK;
+}
+
+CMainDlg* VisualTreeWatcher::DlgMainForCurrentThread() {
+    DWORD dwCurrentThreadId = GetCurrentThreadId();
+
+    {
+        std::shared_lock lock(m_dlgMainMutex);
+
+        auto it = m_dlgMainForEachThread.find(dwCurrentThreadId);
+        if (it != m_dlgMainForEachThread.end()) {
+            return &it->second;
+        }
+    }
+
+    std::unique_lock lock(m_dlgMainMutex);
+
+    auto [it, inserted] = m_dlgMainForEachThread.try_emplace(
+        dwCurrentThreadId, m_xamlDiagnostics, this);
+
+    CMainDlg& dlgMain = it->second;
+
+    if (!inserted) {
+        ATLASSERT(FALSE);
+        return &dlgMain;
+    }
+
+    HWND hChildWnd = nullptr;
+
+    UINT32 length = 0;
+    if (GetCurrentPackageFullName(&length, nullptr) !=
+        APPMODEL_ERROR_NO_PACKAGE) {
+        // Packaged UWP processes seem to lack visual styles, which causes
+        // artifacts such as black squares and UI flickering. This call fixes
+        // it.
+        EnableVisualStyles();
+
+        // Creating a dialog without a parent causes it to be occluded. Using
+        // the core window as a parent window fixes it.
+        if (const auto coreInterop =
+                winrt::Windows::UI::Core::CoreWindow::GetForCurrentThread()
+                    .try_as<ICoreWindowInterop>()) {
+            coreInterop->get_WindowHandle(&hChildWnd);
+        }
+    }
+
+    if (!dlgMain.Create(hChildWnd)) {
+        ATLTRACE(L"Main dialog creation failed!\n");
+        m_dlgMainForEachThread.erase(it);
+        return nullptr;
+    }
+
+    dlgMain.SetOnFinalMessageCallback([](void* param, HWND hWnd) {
+        reinterpret_cast<VisualTreeWatcher*>(param)->OnDlgMainFinalMessage(
+            hWnd);
+    });
+
+    dlgMain.ShowWindow(SW_SHOWDEFAULT);
+    SetForegroundWindow(dlgMain.m_hWnd);
+    return &dlgMain;
+}
+
+void VisualTreeWatcher::OnDlgMainFinalMessage(HWND hWnd) {
+    DWORD dwCurrentThreadId = GetCurrentThreadId();
+
+    std::unique_lock lock(m_dlgMainMutex);
+
+    auto it = m_dlgMainForEachThread.find(dwCurrentThreadId);
+    if (it == m_dlgMainForEachThread.end()) {
+        ATLASSERT(FALSE);
+        return;
+    }
+
+    m_dlgMainForEachThread.erase(it);
 }

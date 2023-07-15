@@ -51,12 +51,39 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL,  // handle to DLL module
 
 HRESULT WINAPI start(DWORD pid) {
     // Calling InitializeXamlDiagnosticsEx the second time will reset the
-    // existing element tree callbacks. Therefore, first check for an existing
-    // window for the target process.
-    auto windowTitle = std::format(L"UWPSpy - PID: {}", pid);
-    HWND existingWindow = FindWindow(L"UWPSpy", windowTitle.c_str());
-    if (existingWindow) {
-        PostMessage(existingWindow, CMainDlg::UWM_ACTIVATE_WINDOW, 0, 0);
+    // existing element tree callbacks. Therefore, first check for existing
+    // windows for the target process.
+
+    struct EnumWindowsData {
+        DWORD pid;
+        BOOL found;
+    };
+
+    EnumWindowsData data = {pid, FALSE};
+
+    EnumWindows(
+        [](HWND hWnd, LPARAM lParam) -> BOOL {
+            EnumWindowsData& data = *reinterpret_cast<EnumWindowsData*>(lParam);
+
+            DWORD windowPid;
+            if (!GetWindowThreadProcessId(hWnd, &windowPid) ||
+                windowPid != data.pid) {
+                return TRUE;
+            }
+
+            WCHAR windowClass[16];
+            if (!GetClassName(hWnd, windowClass, ARRAYSIZE(windowClass)) ||
+                _wcsicmp(windowClass, L"UWPSpy") != 0) {
+                return TRUE;
+            }
+
+            data.found = TRUE;
+            PostMessage(hWnd, CMainDlg::UWM_ACTIVATE_WINDOW, 0, 0);
+            return TRUE;
+        },
+        reinterpret_cast<LPARAM>(&data));
+
+    if (data.found) {
         return S_OK;
     }
 

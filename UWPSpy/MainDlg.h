@@ -8,37 +8,35 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     enum { IDD = IDD_MAINDLG };
 
     enum {
-        HOTKEY_SELECT_ELEMENT_FROM_CURSOR = 1,
-    };
-
-    enum {
         TIMER_ID_REDRAW_TREE = 1,
         TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION,
     };
 
     enum {
         UWM_ACTIVATE_WINDOW = WM_APP,
+        UWM_DESTROY_WINDOW,
     };
 
-    CMainDlg(winrt::com_ptr<IVisualTreeService3> service,
-             winrt::com_ptr<IXamlDiagnostics> diagnostics);
+    using OnFinalMessageCallback_t = void (*)(void* param, HWND hWnd);
+
+    CMainDlg(winrt::com_ptr<IXamlDiagnostics> diagnostics,
+             void* callbacksParam);
     void Hide();
     void Show();
     void ElementAdded(const ParentChildRelation& parentChildRelation,
                       const VisualElement& element);
     void ElementRemoved(InstanceHandle handle);
+    void SetOnFinalMessageCallback(OnFinalMessageCallback_t callback);
 
    private:
     BEGIN_MSG_MAP_EX(CMainDlg)
         CHAIN_MSG_MAP(CDialogResize<CMainDlg>)
         MSG_WM_INITDIALOG(OnInitDialog)
         MSG_WM_DESTROY(OnDestroy)
-        MSG_WM_HOTKEY(OnHotKey)
         MSG_WM_TIMER(OnTimer)
         MSG_WM_CONTEXTMENU(OnContextMenu)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_SELCHANGED,
                           OnElementTreeSelChaneged)
-        NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_KEYDOWN, OnElementTreeKeyDown)
         COMMAND_ID_HANDLER_EX(IDC_SPLIT_TOGGLE, OnSplitToggle)
         NOTIFY_HANDLER_EX(IDC_ATTRIBUTE_LIST, NM_DBLCLK, OnAttributeListDblClk)
         COMMAND_HANDLER_EX(IDC_PROPERTY_NAME, CBN_SELCHANGE,
@@ -54,6 +52,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         COMMAND_ID_HANDLER_EX(ID_APP_ABOUT, OnAppAbout)
         COMMAND_ID_HANDLER_EX(IDCANCEL, OnCancel)
         MESSAGE_HANDLER_EX(UWM_ACTIVATE_WINDOW, OnActivateWindow)
+        MESSAGE_HANDLER_EX(UWM_DESTROY_WINDOW, OnDestroyWindow)
+        // ----------
+        ALT_MSG_MAP(1)
+        MSG_WM_CHAR(ElementTreeOnChar)
     END_MSG_MAP()
 
     struct ResizeData : public CDialogResize<ResizeData> {
@@ -117,11 +119,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     BOOL OnInitDialog(CWindow wndFocus, LPARAM lInitParam);
     void OnDestroy();
-    void OnHotKey(int nHotKeyID, UINT uModifiers, UINT uVirtKey);
     void OnTimer(UINT_PTR nIDEvent);
     void OnContextMenu(CWindow wnd, CPoint point);
     LRESULT OnElementTreeSelChaneged(LPNMHDR pnmh);
-    LRESULT OnElementTreeKeyDown(LPNMHDR pnmh);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnAttributeListDblClk(LPNMHDR pnmh);
     void OnPropertyNameSelChange(UINT uNotifyCode, int nID, CWindow wndCtl);
@@ -134,6 +134,11 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnCancel(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnActivateWindow(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    LRESULT OnDestroyWindow(UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+    void OnFinalMessage(HWND hWnd) override;
+
+    void ElementTreeOnChar(TCHAR chChar, UINT nRepCnt, UINT nFlags);
 
     void RedrawTreeQueue();
     bool SetSelectedElementInformation();
@@ -151,12 +156,15 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     bool SelectElementFromCursor();
 
     CIcon m_icon, m_smallIcon;
+    CContainedWindowT<CTreeViewCtrlEx> m_elementTree;
     bool m_highlightSelection = true;
     bool m_detailedProperties = false;
     bool m_splitModeAttributesExpanded = false;
-    bool m_registeredHotkeySelectElementFromCursor = false;
     bool m_redrawTreeQueued = false;
     bool m_redrawTreeQueuedEnsureSelectionVisible = false;
+
+    void* m_callbacksParam;
+    std::atomic<OnFinalMessageCallback_t> m_onFinalMessageCallback;
 
     winrt::com_ptr<IVisualTreeService3> m_visualTreeService;
     winrt::com_ptr<IXamlDiagnostics> m_xamlDiagnostics;
