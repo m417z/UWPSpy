@@ -59,8 +59,8 @@ void CMainDlg::OnRefresh(UINT uNotifyCode, int nID, CWindow wndCtl) {
 
 void CMainDlg::OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl) {
     PCWSTR content =
-        L"Get a real-time view of any UWP application UI elements, see and "
-        L"manipulate runtime properties of any UI element you select.\n"
+        L"An inspection tool for UWP applications. Seamlessly view and "
+        L"manipulate UI elements and their properties in real time.\n"
         L"\n"
         L"By <A HREF=\"https://ramensoftware.com/\">Ramen Software</A>\n"
         L"\n"

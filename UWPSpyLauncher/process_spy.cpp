@@ -86,9 +86,16 @@ bool ProcessSpy(HWND hWnd, DWORD pid) {
 
     HRESULT hr = start(pid);
     if (FAILED(hr)) {
-        CString str = AtlGetErrorDescription(hr);
-        MessageBox(hWnd, L"Failed to start spying:\n" + str, L"Error",
-                   MB_ICONERROR);
+        CString message =
+            L"Failed to start spying:\n" + AtlGetErrorDescription(hr);
+
+        // E_ELEMENT_NOT_FOUND
+        if (hr == 0x80070490) {
+            message +=
+                L"\n\nMake sure that the target process is a UWP application.";
+        }
+
+        MessageBox(hWnd, message, L"Error", MB_ICONERROR);
         return false;
     }
 
