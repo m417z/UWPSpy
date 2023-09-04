@@ -50,6 +50,8 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL,  // handle to DLL module
 }
 
 HRESULT WINAPI start(DWORD pid) {
+    AllowSetForegroundWindow(pid);
+
     // Calling InitializeXamlDiagnosticsEx the second time will reset the
     // existing element tree callbacks. Therefore, first check for existing
     // windows for the target process.
