@@ -32,8 +32,8 @@ bool IsTreeItemInView(CTreeItem treeItem) {
     CRect clientRect;
     treeItem.GetTreeView()->GetClientRect(clientRect);
 
-    CRect intercectionRect;
-    return intercectionRect.IntersectRect(rect, clientRect);
+    CRect intersectionRect;
+    return intersectionRect.IntersectRect(rect, clientRect);
 }
 
 // https://stackoverflow.com/a/35277401
@@ -652,7 +652,7 @@ void CMainDlg::DestroyFlashArea() {
     }
 }
 
-LRESULT CMainDlg::OnElementTreeSelChaneged(LPNMHDR pnmh) {
+LRESULT CMainDlg::OnElementTreeSelChanged(LPNMHDR pnmh) {
     SetSelectedElementInformation();
 
     return 0;
