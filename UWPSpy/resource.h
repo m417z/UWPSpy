@@ -24,7 +24,9 @@
 #define IDC_HIGHLIGHT_SELECTION         1015
 #define IDC_DETAILED_PROPERTIES         1016
 #define IDC_ABOUT_TITLE                 1017
-#define IDC_ABOUT_CONTENT_SYSLINK       1018
+#define IDC_ABOUT_BUTTON_RAMEN_SOFTWARE 1018
+#define IDC_ABOUT_BUTTON_HOMEPAGE       1019
+#define IDC_ABOUT_BUTTON_SOURCE_CODE    1020
 
 // Next default values for new objects
 // 
@@ -32,7 +34,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        204
 #define _APS_NEXT_COMMAND_VALUE         32775
-#define _APS_NEXT_CONTROL_VALUE         1019
+#define _APS_NEXT_CONTROL_VALUE         1021
 #define _APS_NEXT_SYMED_VALUE           100
 #endif
 #endif

@@ -42,20 +42,18 @@ BOOL CAboutDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     return TRUE;
 }
 
-LRESULT CAboutDlg::OnNotify(int idCtrl, LPNMHDR pnmh) {
-    switch (pnmh->idFrom) {
-        case IDC_ABOUT_CONTENT_SYSLINK:
-            switch (pnmh->code) {
-                case NM_CLICK:
-                case NM_RETURN:
-                    OpenUrl(m_hWnd, ((PNMLINK)pnmh)->item.szUrl);
-                    break;
-            }
-            break;
-    }
+void CAboutDlg::OnButtonRamenSoftware(UINT uNotifyCode,
+                                      int nID,
+                                      CWindow wndCtl) {
+    OpenUrl(m_hWnd, L"https://ramensoftware.com/");
+}
 
-    SetMsgHandled(FALSE);
-    return 0;
+void CAboutDlg::OnButtonHomepage(UINT uNotifyCode, int nID, CWindow wndCtl) {
+    OpenUrl(m_hWnd, L"https://ramensoftware.com/uwpspy");
+}
+
+void CAboutDlg::OnButtonSourceCode(UINT uNotifyCode, int nID, CWindow wndCtl) {
+    OpenUrl(m_hWnd, L"https://github.com/m417z/UWPSpy");
 }
 
 void CAboutDlg::OnOK(UINT uNotifyCode, int nID, CWindow wndCtl) {

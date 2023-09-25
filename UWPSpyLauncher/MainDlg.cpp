@@ -64,7 +64,7 @@ void CMainDlg::OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl) {
         L"\n"
         L"By <A HREF=\"https://ramensoftware.com/\">Ramen Software</A>\n"
         L"\n"
-        L"<A HREF=\"https://ramensoftware.com/uwpspy\">Web page</a>\n"
+        L"<A HREF=\"https://ramensoftware.com/uwpspy\">Homepage</a>\n"
         L"<A HREF=\"https://github.com/m417z/UWPSpy\">Source code</a>";
 
     TASKDIALOGCONFIG taskDialogConfig{
