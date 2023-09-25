@@ -46,6 +46,7 @@ extern CAppModule _Module;
 #include <guiddef.h>
 #include <libloaderapi.h>
 #include <ocidl.h>
+#include <tlhelp32.h>
 #include <unknwn.h>
 #include <wincodec.h>
 #include <windows.ui.xaml.hosting.desktopwindowxamlsource.h>

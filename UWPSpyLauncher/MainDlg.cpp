@@ -175,7 +175,7 @@ void CMainDlg::LoadProcessList() {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot != INVALID_HANDLE_VALUE) {
         PROCESSENTRY32 entry{
-            .dwSize = sizeof(PROCESSENTRY32),
+            .dwSize = sizeof(entry),
         };
         if (Process32First(snapshot, &entry)) {
             do {

@@ -21,6 +21,33 @@ ATOM RegisterDialogClass(LPCTSTR lpszClassName, HINSTANCE hInstance) {
     return ::RegisterClass(&wndcls);
 }
 
+bool GetLoadedDllPath(DWORD processId,
+                      PCWSTR dllName,
+                      WCHAR resultDllPath[MAX_PATH]) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, processId);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    bool succeeded = false;
+
+    MODULEENTRY32 entry{
+        .dwSize = sizeof(entry),
+    };
+    if (Module32First(snapshot, &entry)) {
+        do {
+            if (_wcsicmp(entry.szModule, dllName) == 0) {
+                wcscpy_s(resultDllPath, MAX_PATH, entry.szExePath);
+                succeeded = true;
+                break;
+            }
+        } while (Module32Next(snapshot, &entry));
+    }
+
+    CloseHandle(snapshot);
+    return succeeded;
+}
+
 }  // namespace
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL,  // handle to DLL module
@@ -47,6 +74,46 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL,  // handle to DLL module
     }
 
     return TRUE;
+}
+
+HRESULT UwpInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
+    const HMODULE wux(LoadLibraryEx(L"Windows.UI.Xaml.dll", nullptr,
+                                    LOAD_LIBRARY_SEARCH_SYSTEM32));
+    if (!wux) {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    const auto ixde = reinterpret_cast<PFN_INITIALIZE_XAML_DIAGNOSTICS_EX>(
+        GetProcAddress(wux, "InitializeXamlDiagnosticsEx"));
+    if (!ixde) {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    return ixde(L"VisualDiagConnection1", pid, nullptr, dllLocation,
+                CLSID_ExplorerTAP, nullptr);
+}
+
+HRESULT WinUIInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
+    WCHAR microsoftInternalFrameworkUdkPath[MAX_PATH];
+    if (!GetLoadedDllPath(pid, L"Microsoft.Internal.FrameworkUdk.dll",
+                          microsoftInternalFrameworkUdkPath)) {
+        return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
+    }
+
+    const HMODULE wux(LoadLibraryEx(microsoftInternalFrameworkUdkPath, nullptr,
+                                    LOAD_WITH_ALTERED_SEARCH_PATH));
+    if (!wux) {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    const auto ixde = reinterpret_cast<PFN_INITIALIZE_XAML_DIAGNOSTICS_EX>(
+        GetProcAddress(wux, "InitializeXamlDiagnosticsEx"));
+    if (!ixde) {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    return ixde(L"WinUIVisualDiagConnection1", pid, nullptr, dllLocation,
+                CLSID_ExplorerTAP, nullptr);
 }
 
 HRESULT WINAPI start(DWORD pid) {
@@ -97,23 +164,10 @@ HRESULT WINAPI start(DWORD pid) {
             return HRESULT_FROM_WIN32(GetLastError());
     }
 
-    const HMODULE wux(LoadLibraryEx(L"Windows.UI.Xaml.dll", nullptr,
-                                    LOAD_LIBRARY_SEARCH_SYSTEM32));
-    if (!wux) [[unlikely]] {
-        return HRESULT_FROM_WIN32(GetLastError());
+    HRESULT hr = WinUIInitializeXamlDiagnostics(pid, location);
+    if (SUCCEEDED(hr)) {
+        return hr;
     }
 
-    const auto ixde = reinterpret_cast<PFN_INITIALIZE_XAML_DIAGNOSTICS_EX>(
-        GetProcAddress(wux, "InitializeXamlDiagnosticsEx"));
-    if (!ixde) [[unlikely]] {
-        return HRESULT_FROM_WIN32(GetLastError());
-    }
-
-    const HRESULT hr2 = ixde(L"VisualDiagConnection1", pid, nullptr, location,
-                             CLSID_ExplorerTAP, nullptr);
-    if (FAILED(hr2)) [[unlikely]] {
-        return hr2;
-    }
-
-    return S_OK;
+    return UwpInitializeXamlDiagnostics(pid, location);
 }
