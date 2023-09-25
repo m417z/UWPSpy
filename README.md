@@ -3,8 +3,8 @@
 	<h1>UWPSpy</h1>
 </div>
 
-An inspection tool for UWP applications. Seamlessly view and manipulate UI
-elements and their properties in real time.
+An inspection tool for UWP and WinUI 3 applications. Seamlessly view and
+manipulate UI elements and their properties in real time.
 
 [🏠 Homepage](https://ramensoftware.com/uwpspy)
 
@@ -14,11 +14,11 @@ elements and their properties in real time.
 
 - Download the latest release from
   [here](https://ramensoftware.com/downloads/uwpspy.zip).
-- Run `UWPSpy.exe` and select the UWP application you want to spy on.
+- Run **UWPSpy.exe** and select the UWP/WinUI 3 application you want to spy on.
 - A window with the application's UI elements will appear for each UI thread of
   the target application.
 - A UWPSpy spying window can be closed, in which case it will become hidden. It
-  can be shown again by running `UWPSpy.exe` again and selecting the same
+  can be shown again by running **UWPSpy.exe** again and selecting the same
   application.
 - To completely stop spying on an application, its process must be terminated.
 

@@ -64,3 +64,14 @@ extern CAppModule _Module;
 #include <winrt/windows.ui.xaml.h>
 #include <winrt/windows.ui.xaml.hosting.h>
 #include <winrt/windows.ui.xaml.media.h>
+
+// WinUI
+
+#include "winui/microsoft.ui.xaml.hosting.desktopwindowxamlsource_winui.h"
+
+// For IVisualTreeServiceCallback3 if it ever becomes useful.
+// #include "winui/xamlom.winui.h"
+
+#include "winrt/microsoft.ui.xaml.h"
+#include "winrt/microsoft.ui.xaml.hosting.h"
+#include "winrt/microsoft.ui.xaml.media.h"

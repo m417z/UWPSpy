@@ -59,8 +59,8 @@ void CMainDlg::OnRefresh(UINT uNotifyCode, int nID, CWindow wndCtl) {
 
 void CMainDlg::OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl) {
     PCWSTR content =
-        L"An inspection tool for UWP applications. Seamlessly view and "
-        L"manipulate UI elements and their properties in real time.\n"
+        L"An inspection tool for UWP and WinUI 3 applications. Seamlessly view "
+        L"and manipulate UI elements and their properties in real time.\n"
         L"\n"
         L"By <A HREF=\"https://ramensoftware.com/\">Ramen Software</A>\n"
         L"\n"

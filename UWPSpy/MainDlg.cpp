@@ -81,16 +81,24 @@ int GetRequiredComboDroppedWidth(CComboBox rCombo) {
 }
 
 std::optional<CRect> GetRelativeElementRect(wf::IInspectable element) {
+    std::optional<wf::Point> offset;
+    std::optional<wf::Numerics::float2> size;
     if (auto uiElement = element.try_as<wux::UIElement>()) {
-        const auto offset = uiElement.TransformToVisual(nullptr).TransformPoint(
+        offset = uiElement.TransformToVisual(nullptr).TransformPoint(
             wf::Point(0, 0));
-        const auto size = uiElement.ActualSize();
+        size = uiElement.ActualSize();
+    } else if (auto uiElement = element.try_as<mux::UIElement>()) {
+        offset = uiElement.TransformToVisual(nullptr).TransformPoint(
+            wf::Point(0, 0));
+        size = uiElement.ActualSize();
+    }
 
+    if (offset && size) {
         CRect rect;
-        rect.left = std::lroundf(offset.X);
-        rect.top = std::lroundf(offset.Y);
-        rect.right = rect.left + std::lroundf(size.x);
-        rect.bottom = rect.top + std::lroundf(size.y);
+        rect.left = std::lroundf(offset->X);
+        rect.top = std::lroundf(offset->Y);
+        rect.right = rect.left + std::lroundf(size->x);
+        rect.bottom = rect.top + std::lroundf(size->y);
 
         return rect;
     }
@@ -100,44 +108,56 @@ std::optional<CRect> GetRelativeElementRect(wf::IInspectable element) {
 
 std::optional<CRect> GetRootElementRect(wf::IInspectable element,
                                         HWND* outWnd = nullptr) {
-    if (auto window = element.try_as<winrt::Windows::UI::Xaml::Window>()) {
-        const auto bounds = window.Bounds();
-
-        CRect rect;
-        rect.left = std::lroundf(bounds.X);
-        rect.top = std::lroundf(bounds.Y);
-        rect.right = rect.left + std::lroundf(bounds.Width);
-        rect.bottom = rect.top + std::lroundf(bounds.Height);
-
+    std::optional<wf::Rect> bounds;
+    winrt::Windows::UI::Core::CoreWindow coreWindow = nullptr;
+    if (auto window = element.try_as<wux::Window>()) {
+        bounds = window.Bounds();
         if (outWnd) {
-            if (auto coreWindow = window.CoreWindow()) {
-                if (const auto coreInterop =
-                        coreWindow.try_as<ICoreWindowInterop>()) {
-                    coreInterop->get_WindowHandle(outWnd);
-                }
+            coreWindow = window.CoreWindow();
+        }
+    } else if (auto window = element.try_as<mux::Window>()) {
+        bounds = window.Bounds();
+        if (outWnd) {
+            coreWindow = window.CoreWindow();
+        }
+    }
+
+    if (bounds) {
+        CRect rect;
+        rect.left = std::lroundf(bounds->X);
+        rect.top = std::lroundf(bounds->Y);
+        rect.right = rect.left + std::lroundf(bounds->Width);
+        rect.bottom = rect.top + std::lroundf(bounds->Height);
+
+        if (outWnd && coreWindow) {
+            if (const auto coreInterop =
+                    coreWindow.try_as<ICoreWindowInterop>()) {
+                coreInterop->get_WindowHandle(outWnd);
             }
         }
 
         return rect;
     }
 
-    if (auto desktopWindowXamlSource =
-            element.try_as<wux::Hosting::DesktopWindowXamlSource>()) {
-        const auto nativeSource =
-            desktopWindowXamlSource.as<IDesktopWindowXamlSourceNative>();
+    CWindow nativeWnd;
+    if (auto nativeSource = element.try_as<IDesktopWindowXamlSourceNative>()) {
+        nativeSource->get_WindowHandle(&nativeWnd.m_hWnd);
+    } else if (auto nativeSource =
+                   element.try_as<IDesktopWindowXamlSourceNative_WinUI>()) {
+        nativeSource->get_WindowHandle(&nativeWnd.m_hWnd);
+    }
 
+    if (nativeWnd) {
         // A window which is no longer valid might be returned if the element is
         // being destroyed.
-        CWindow wnd;
-        if (FAILED(nativeSource->get_WindowHandle(&wnd.m_hWnd)) || !wnd ||
-            !wnd.IsWindow()) {
+        if (!nativeWnd.IsWindow()) {
             return std::nullopt;
         }
 
         CRect rectWithDpi;
-        wnd.GetWindowRect(rectWithDpi);
+        nativeWnd.GetWindowRect(rectWithDpi);
 
-        UINT dpi = ::GetDpiForWindow(wnd);
+        UINT dpi = ::GetDpiForWindow(nativeWnd);
         CRect rect;
         rect.left = MulDiv(rectWithDpi.left, 96, dpi);
         rect.top = MulDiv(rectWithDpi.top, 96, dpi);
@@ -148,7 +168,7 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
             rect.top + MulDiv(rectWithDpi.bottom - rectWithDpi.top, 96, dpi);
 
         if (outWnd) {
-            *outWnd = wnd;
+            *outWnd = nativeWnd;
         }
 
         return rect;
@@ -451,12 +471,18 @@ void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
             handle,
             reinterpret_cast<::IInspectable**>(winrt::put_abi(element))));
 
-        auto uiElement = element.try_as<wux::UIElement>();
-        if (!uiElement) {
+        auto wuiElement = element.try_as<wux::UIElement>();
+        auto muiElement = wuiElement ? mux::UIElement{nullptr}
+                                     : element.try_as<mux::UIElement>();
+
+        bool visible;
+        if (wuiElement) {
+            visible = wuiElement.Visibility() == wux::Visibility::Visible;
+        } else if (muiElement) {
+            visible = muiElement.Visibility() == mux::Visibility::Visible;
+        } else {
             return;
         }
-
-        bool visible = uiElement.Visibility() == wux::Visibility::Visible;
 
         menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0), MENU_ID_VISIBLE,
                         L"Visible");
@@ -465,8 +491,13 @@ void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
                                        menuPoint.x, menuPoint.y, m_hWnd);
         switch (nCmd) {
             case MENU_ID_VISIBLE:
-                uiElement.Visibility(visible ? wux::Visibility::Collapsed
-                                             : wux::Visibility::Visible);
+                if (wuiElement) {
+                    wuiElement.Visibility(visible ? wux::Visibility::Collapsed
+                                                  : wux::Visibility::Visible);
+                } else if (muiElement) {
+                    muiElement.Visibility(visible ? mux::Visibility::Collapsed
+                                                  : mux::Visibility::Visible);
+                }
 
                 RefreshSelectedElementInformation();
                 break;
@@ -499,18 +530,46 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
             continue;
         }
 
-        wux::UIElement subtree = nullptr;
+        wux::UIElement wsubtree = nullptr;
+        mux::UIElement msubtree = nullptr;
 
-        if (auto window =
-                rootElement.try_as<winrt::Windows::UI::Xaml::Window>()) {
-            subtree = window.Content();
+        if (auto window = rootElement.try_as<wux::Window>()) {
+            wsubtree = window.Content();
         } else if (auto desktopWindowXamlSource =
                        rootElement
                            .try_as<wux::Hosting::DesktopWindowXamlSource>()) {
-            subtree = desktopWindowXamlSource.Content();
+            wsubtree = desktopWindowXamlSource.Content();
+        } else if (auto window = rootElement.try_as<mux::Window>()) {
+            msubtree = window.Content();
+        } else if (auto desktopWindowXamlSource =
+                       rootElement
+                           .try_as<mux::Hosting::DesktopWindowXamlSource>()) {
+            msubtree = desktopWindowXamlSource.Content();
+        } else {
+            // Ugly fallback: If the above didn't work, get the first child and
+            // try to get the XamlRoot from that.
+            auto childItem = item.GetChild();
+            if (childItem) {
+                auto childHandle =
+                    static_cast<InstanceHandle>(childItem.GetData());
+
+                wf::IInspectable rootChildElement;
+                HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
+                    childHandle, reinterpret_cast<::IInspectable**>(
+                                     winrt::put_abi(rootChildElement)));
+                if (SUCCEEDED(hr) && rootChildElement) {
+                    if (auto uiElement =
+                            rootChildElement.try_as<wux::UIElement>()) {
+                        wsubtree = uiElement.XamlRoot().Content();
+                    } else if (auto uiElement =
+                                   rootChildElement.try_as<mux::UIElement>()) {
+                        msubtree = uiElement.XamlRoot().Content();
+                    }
+                }
+            }
         }
 
-        if (!subtree) {
+        if (!wsubtree && !msubtree) {
             continue;
         }
 
@@ -531,8 +590,15 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
         CPoint ptWithoutDpiRelative = ptWithoutDpi;
         ptWithoutDpiRelative.Offset(-rootElementRect->TopLeft());
 
-        InstanceHandle foundHandle =
-            ElementFromPointInSubtree(subtree, ptWithoutDpiRelative);
+        InstanceHandle foundHandle = 0;
+        if (wsubtree) {
+            foundHandle =
+                ElementFromPointInSubtree(wsubtree, ptWithoutDpiRelative);
+        } else if (msubtree) {
+            foundHandle =
+                ElementFromPointInSubtree(msubtree, ptWithoutDpiRelative);
+        }
+
         if (foundHandle) {
             return foundHandle;
         }
@@ -543,11 +609,34 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
 
 InstanceHandle CMainDlg::ElementFromPointInSubtree(wux::UIElement subtree,
                                                    CPoint pt) {
-    wf::Rect rect(wf::Point{static_cast<float>(pt.x), static_cast<float>(pt.y)},
-                  wf::Size{1, 1});
+    wf::Rect rect{wf::Point{static_cast<float>(pt.x), static_cast<float>(pt.y)},
+                  wf::Size{1, 1}};
 
-    auto elements = winrt::Windows::UI::Xaml::Media::VisualTreeHelper::
-        FindElementsInHostCoordinates(rect, subtree);
+    auto elements = wux::Media::VisualTreeHelper::FindElementsInHostCoordinates(
+        rect, subtree);
+
+    for (auto element : elements) {
+        InstanceHandle handle;
+        HRESULT hr = m_xamlDiagnostics->GetHandleFromIInspectable(
+            reinterpret_cast<::IInspectable*>(winrt::get_abi(element)),
+            &handle);
+        if (FAILED(hr)) {
+            continue;
+        }
+
+        return handle;
+    }
+
+    return 0;
+}
+
+InstanceHandle CMainDlg::ElementFromPointInSubtree(mux::UIElement subtree,
+                                                   CPoint pt) {
+    wf::Rect rect{wf::Point{static_cast<float>(pt.x), static_cast<float>(pt.y)},
+                  wf::Size{1, 1}};
+
+    auto elements = mux::Media::VisualTreeHelper::FindElementsInHostCoordinates(
+        rect, subtree);
 
     for (auto element : elements) {
         InstanceHandle handle;
@@ -956,18 +1045,21 @@ bool CMainDlg::SetSelectedElementInformation() {
         SetDlgItemText(IDC_CLASS_EDIT, errorMsg.c_str());
     }
 
-    if (auto frameworkElement = obj.try_as<wux::FrameworkElement>()) {
-        try {
-            SetDlgItemText(IDC_NAME_EDIT, frameworkElement.Name().c_str());
-        } catch (...) {
-            HRESULT hr = winrt::to_hresult();
-            auto errorMsg =
-                std::format(L"Error {:08X}", static_cast<DWORD>(hr));
-            SetDlgItemText(IDC_NAME_EDIT, errorMsg.c_str());
+    std::wstring frameworkElementName;
+    try {
+        if (auto frameworkElement = obj.try_as<wux::FrameworkElement>()) {
+            frameworkElementName = frameworkElement.Name();
+        } else if (auto frameworkElement =
+                       obj.try_as<mux::FrameworkElement>()) {
+            frameworkElementName = frameworkElement.Name();
         }
-    } else {
-        SetDlgItemText(IDC_NAME_EDIT, L"");
+    } catch (...) {
+        HRESULT hr = winrt::to_hresult();
+        frameworkElementName =
+            std::format(L"Error {:08X}", static_cast<DWORD>(hr));
     }
+
+    SetDlgItemText(IDC_NAME_EDIT, frameworkElementName.c_str());
 
     if (obj) {
         try {

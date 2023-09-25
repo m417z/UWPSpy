@@ -151,6 +151,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
                        ElementItem* elementItem);
     InstanceHandle ElementFromPoint(CPoint pt);
     InstanceHandle ElementFromPointInSubtree(wux::UIElement subtree, CPoint pt);
+    InstanceHandle ElementFromPointInSubtree(mux::UIElement subtree, CPoint pt);
     bool CreateFlashArea(InstanceHandle handle);
     void DestroyFlashArea();
     bool SelectElementFromCursor();

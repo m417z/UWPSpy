@@ -92,7 +92,8 @@ bool ProcessSpy(HWND hWnd, DWORD pid) {
         // E_ELEMENT_NOT_FOUND
         if (hr == 0x80070490) {
             message +=
-                L"\n\nMake sure that the target process is a UWP application.";
+                L"\n\nMake sure that the target process is a UWP or a WinUI 3 "
+                L"application.";
         }
 
         MessageBox(hWnd, message, L"Error", MB_ICONERROR);
