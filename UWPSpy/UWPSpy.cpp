@@ -90,7 +90,7 @@ HRESULT UwpInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
     }
 
     return ixde(L"VisualDiagConnection1", pid, nullptr, dllLocation,
-                CLSID_ExplorerTAP, nullptr);
+                CLSID_UWPSpyTAP, nullptr);
 }
 
 HRESULT WinUIInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
@@ -113,7 +113,7 @@ HRESULT WinUIInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
     }
 
     return ixde(L"WinUIVisualDiagConnection1", pid, nullptr, dllLocation,
-                CLSID_ExplorerTAP, nullptr);
+                CLSID_UWPSpyTAP, nullptr);
 }
 
 HRESULT WINAPI start(DWORD pid) {

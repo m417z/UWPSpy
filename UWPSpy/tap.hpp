@@ -4,7 +4,7 @@
 #include "winrt.hpp"
 
 // {4CE91FA6-B898-48AC-BE31-A5485A7435E7}
-static constexpr CLSID CLSID_ExplorerTAP = {
+static constexpr CLSID CLSID_UWPSpyTAP = {
     0x4ce91fa6,
     0xb898,
     0x48ac,

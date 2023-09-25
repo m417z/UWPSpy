@@ -7,7 +7,7 @@
 _Use_decl_annotations_ STDAPI DllGetClassObject(REFCLSID rclsid,
                                                 REFIID riid,
                                                 LPVOID* ppv) try {
-    if (rclsid == CLSID_ExplorerTAP) {
+    if (rclsid == CLSID_UWPSpyTAP) {
         *ppv = nullptr;
         return winrt::make<SimpleFactory<ExplorerTAP>>().as(riid, ppv);
     } else {
