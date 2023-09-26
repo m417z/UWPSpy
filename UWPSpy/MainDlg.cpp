@@ -1128,16 +1128,22 @@ void CMainDlg::ResetAttributesListColumns() {
 
     attributesList.DeleteAllItems();
 
-    // If columns exist, try to retain width.
-    int width = attributesList.GetColumnWidth(0) * 2;
+    int firstColumnWidth = attributesList.GetColumnWidth(0);
+
+    if (attributesList.DeleteColumn(0)) {
+        while (attributesList.DeleteColumn(0)) {
+            // Keep deleting...
+        }
+    } else {
+        firstColumnWidth = 0;
+    }
+
+    // If columns existed, try to retain width.
+    int width = firstColumnWidth * 2;
     if (!width) {
         CRect rect;
         attributesList.GetClientRect(rect);
         width = rect.Width() - ::GetSystemMetrics(SM_CXVSCROLL);
-    }
-
-    while (attributesList.DeleteColumn(0)) {
-        // Keep deleting...
     }
 
     int c = 0;
