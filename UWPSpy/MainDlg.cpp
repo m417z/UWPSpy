@@ -415,6 +415,11 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
             break;
         }
 
+        case TIMER_ID_SET_SELECTED_ELEMENT_INFORMATION:
+            KillTimer(nIDEvent);
+            SetSelectedElementInformation();
+            break;
+
         case TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION:
             KillTimer(nIDEvent);
             RefreshSelectedElementInformation(0);
@@ -742,7 +747,22 @@ void CMainDlg::DestroyFlashArea() {
 }
 
 LRESULT CMainDlg::OnElementTreeSelChanged(LPNMHDR pnmh) {
-    SetSelectedElementInformation();
+    NMTREEVIEW* pnmtv = (NMTREEVIEW*)pnmh;
+
+    switch (pnmtv->action) {
+        case TVC_BYKEYBOARD:
+        case TVC_BYMOUSE:
+            SetSelectedElementInformation();
+            break;
+
+        default:
+            // Action is TVC_UNKNOWN when the selection is changed after the
+            // previous selection was deleted. Use a delay since the app might
+            // be busy deleting many items at once.
+            SetTimer(TIMER_ID_SET_SELECTED_ELEMENT_INFORMATION,
+                     kRedrawTreeDelay);
+            break;
+    }
 
     return 0;
 }
@@ -1020,6 +1040,7 @@ void CMainDlg::RedrawTreeQueue() {
 }
 
 bool CMainDlg::SetSelectedElementInformation() {
+    KillTimer(TIMER_ID_SET_SELECTED_ELEMENT_INFORMATION);
     KillTimer(TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION);
 
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
