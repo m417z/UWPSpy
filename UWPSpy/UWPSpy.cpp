@@ -48,6 +48,46 @@ bool GetLoadedDllPath(DWORD processId,
     return succeeded;
 }
 
+HRESULT UwpInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
+    const HMODULE wux(LoadLibraryEx(L"Windows.UI.Xaml.dll", nullptr,
+                                    LOAD_LIBRARY_SEARCH_SYSTEM32));
+    if (!wux) {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    const auto ixde = reinterpret_cast<PFN_INITIALIZE_XAML_DIAGNOSTICS_EX>(
+        GetProcAddress(wux, "InitializeXamlDiagnosticsEx"));
+    if (!ixde) {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    return ixde(L"VisualDiagConnection1", pid, nullptr, dllLocation,
+                CLSID_UWPSpyTAP, nullptr);
+}
+
+HRESULT WinUIInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
+    WCHAR microsoftInternalFrameworkUdkPath[MAX_PATH];
+    if (!GetLoadedDllPath(pid, L"Microsoft.Internal.FrameworkUdk.dll",
+                          microsoftInternalFrameworkUdkPath)) {
+        return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
+    }
+
+    const HMODULE mux(LoadLibraryEx(microsoftInternalFrameworkUdkPath, nullptr,
+                                    LOAD_WITH_ALTERED_SEARCH_PATH));
+    if (!mux) {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    const auto ixde = reinterpret_cast<PFN_INITIALIZE_XAML_DIAGNOSTICS_EX>(
+        GetProcAddress(mux, "InitializeXamlDiagnosticsEx"));
+    if (!ixde) {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    return ixde(L"WinUIVisualDiagConnection1", pid, nullptr, dllLocation,
+                CLSID_UWPSpyTAP, nullptr);
+}
+
 }  // namespace
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL,  // handle to DLL module
@@ -76,47 +116,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL,  // handle to DLL module
     return TRUE;
 }
 
-HRESULT UwpInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
-    const HMODULE wux(LoadLibraryEx(L"Windows.UI.Xaml.dll", nullptr,
-                                    LOAD_LIBRARY_SEARCH_SYSTEM32));
-    if (!wux) {
-        return HRESULT_FROM_WIN32(GetLastError());
-    }
-
-    const auto ixde = reinterpret_cast<PFN_INITIALIZE_XAML_DIAGNOSTICS_EX>(
-        GetProcAddress(wux, "InitializeXamlDiagnosticsEx"));
-    if (!ixde) {
-        return HRESULT_FROM_WIN32(GetLastError());
-    }
-
-    return ixde(L"VisualDiagConnection1", pid, nullptr, dllLocation,
-                CLSID_UWPSpyTAP, nullptr);
-}
-
-HRESULT WinUIInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
-    WCHAR microsoftInternalFrameworkUdkPath[MAX_PATH];
-    if (!GetLoadedDllPath(pid, L"Microsoft.Internal.FrameworkUdk.dll",
-                          microsoftInternalFrameworkUdkPath)) {
-        return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
-    }
-
-    const HMODULE wux(LoadLibraryEx(microsoftInternalFrameworkUdkPath, nullptr,
-                                    LOAD_WITH_ALTERED_SEARCH_PATH));
-    if (!wux) {
-        return HRESULT_FROM_WIN32(GetLastError());
-    }
-
-    const auto ixde = reinterpret_cast<PFN_INITIALIZE_XAML_DIAGNOSTICS_EX>(
-        GetProcAddress(wux, "InitializeXamlDiagnosticsEx"));
-    if (!ixde) {
-        return HRESULT_FROM_WIN32(GetLastError());
-    }
-
-    return ixde(L"WinUIVisualDiagConnection1", pid, nullptr, dllLocation,
-                CLSID_UWPSpyTAP, nullptr);
-}
-
-HRESULT WINAPI start(DWORD pid) {
+HRESULT WINAPI start(DWORD pid, DWORD framework) {
     AllowSetForegroundWindow(pid);
 
     // Calling InitializeXamlDiagnosticsEx the second time will reset the
@@ -164,10 +164,18 @@ HRESULT WINAPI start(DWORD pid) {
             return HRESULT_FROM_WIN32(GetLastError());
     }
 
-    HRESULT hr = WinUIInitializeXamlDiagnostics(pid, location);
-    if (SUCCEEDED(hr)) {
-        return hr;
+    enum Framework : DWORD {
+        kFrameworkUWP = 1,
+        kFrameworkWinUI,
+    };
+
+    switch (framework) {
+        case kFrameworkUWP:
+            return UwpInitializeXamlDiagnostics(pid, location);
+
+        case kFrameworkWinUI:
+            return WinUIInitializeXamlDiagnostics(pid, location);
     }
 
-    return UwpInitializeXamlDiagnostics(pid, location);
+    return E_INVALIDARG;
 }

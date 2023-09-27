@@ -35,6 +35,8 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     InitProcessList();
     LoadProcessList();
 
+    CheckDlgButton(IDC_RADIO_UWP, BST_CHECKED);
+
     return TRUE;
 }
 
@@ -46,11 +48,7 @@ void CMainDlg::OnOK(UINT uNotifyCode, int nID, CWindow wndCtl) {
         return;
     }
 
-    DWORD pid =
-        static_cast<DWORD>(m_processListSort.GetItemData(selectedIndex));
-    if (ProcessSpy(m_hWnd, pid)) {
-        EndDialog(0);
-    }
+    ProcessSpyFromList(selectedIndex);
 }
 
 void CMainDlg::OnRefresh(UINT uNotifyCode, int nID, CWindow wndCtl) {
@@ -101,11 +99,7 @@ LRESULT CMainDlg::OnListDblClk(LPNMHDR pnmh) {
         return 0;
     }
 
-    DWORD pid =
-        static_cast<DWORD>(m_processListSort.GetItemData(lpnmitem->iItem));
-    if (ProcessSpy(m_hWnd, pid)) {
-        EndDialog(0);
-    }
+    ProcessSpyFromList(lpnmitem->iItem);
 
     return 0;
 }
@@ -203,4 +197,17 @@ void CMainDlg::LoadProcessList() {
     m_processListSort.RedrawWindow(
         nullptr, nullptr,
         RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
+}
+
+void CMainDlg::ProcessSpyFromList(int index) {
+    DWORD pid = static_cast<DWORD>(m_processListSort.GetItemData(index));
+
+    ProcessSpyFramework framework = kFrameworkUWP;
+    if (IsDlgButtonChecked(IDC_RADIO_WINUI) != BST_UNCHECKED) {
+        framework = kFrameworkWinUI;
+    }
+
+    if (ProcessSpy(m_hWnd, pid, framework)) {
+        EndDialog(0);
+    }
 }

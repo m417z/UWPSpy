@@ -8,6 +8,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     BEGIN_DLGRESIZE_MAP(CMainDlg)
         DLGRESIZE_CONTROL(IDC_PROCESS_LIST, DLSZ_SIZE_X | DLSZ_SIZE_Y)
+        DLGRESIZE_CONTROL(IDC_STATIC_FRAMEWORK, DLSZ_MOVE_Y)
+        DLGRESIZE_CONTROL(IDC_RADIO_UWP, DLSZ_MOVE_Y)
+        DLGRESIZE_CONTROL(IDC_RADIO_WINUI, DLSZ_MOVE_Y)
         DLGRESIZE_CONTROL(IDOK, DLSZ_MOVE_Y)
         DLGRESIZE_CONTROL(IDC_REFRESH_BUTTON, DLSZ_MOVE_Y)
         DLGRESIZE_CONTROL(ID_APP_ABOUT, DLSZ_MOVE_X | DLSZ_MOVE_Y)
@@ -35,6 +38,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     void InitProcessList();
     void LoadProcessList();
+    void ProcessSpyFromList(int index);
 
     CIcon m_icon, m_smallIcon;
     CSortListViewCtrl m_processListSort;

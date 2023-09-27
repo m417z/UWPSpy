@@ -21,12 +21,17 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance,
     int nRet = 0;
 
     DWORD pid = 0;
+    ProcessSpyFramework framework = kFrameworkUWP;
     if (__argc >= 2) {
         pid = wcstoul(__wargv[1], nullptr, 0);
+
+        if (__argc >= 3 && _wcsicmp(__wargv[2], L"winui") == 0) {
+            framework = kFrameworkWinUI;
+        }
     }
 
     if (pid) {
-        ProcessSpy(nullptr, pid);
+        ProcessSpy(nullptr, pid, framework);
     } else {
         CMainDlg dlgMain;
         nRet = (int)dlgMain.DoModal();

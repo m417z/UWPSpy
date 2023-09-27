@@ -33,7 +33,7 @@ bool AllowAppContainerAccess(PCWSTR path) {
 
 }  // namespace
 
-bool ProcessSpy(HWND hWnd, DWORD pid) {
+bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
     WCHAR path[MAX_PATH];
     switch (GetModuleFileName(nullptr, path, ARRAYSIZE(path))) {
         case 0:
@@ -75,7 +75,7 @@ bool ProcessSpy(HWND hWnd, DWORD pid) {
         return false;
     }
 
-    using start_proc_t = HRESULT(WINAPI*)(DWORD pid);
+    using start_proc_t = HRESULT(WINAPI*)(DWORD pid, DWORD framework);
 
     start_proc_t start = (start_proc_t)GetProcAddress(lib, "start");
     if (!start) {
@@ -84,16 +84,27 @@ bool ProcessSpy(HWND hWnd, DWORD pid) {
         return false;
     }
 
-    HRESULT hr = start(pid);
+    HRESULT hr = start(pid, framework);
     if (FAILED(hr)) {
         CString message =
             L"Failed to start spying:\n" + AtlGetErrorDescription(hr);
 
-        // E_ELEMENT_NOT_FOUND
-        if (hr == 0x80070490) {
-            message +=
-                L"\n\nMake sure that the target process is a UWP or a WinUI 3 "
-                L"application.";
+        switch (framework) {
+            case kFrameworkUWP:
+                if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND)) {
+                    message +=
+                        L"\n\nMake sure that the target process is a UWP "
+                        L"application.";
+                }
+                break;
+
+            case kFrameworkWinUI:
+                if (hr == HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND)) {
+                    message +=
+                        L"\n\nMake sure that the target process is a WinUI 3 "
+                        L"application.";
+                }
+                break;
         }
 
         MessageBox(hWnd, message, L"Error", MB_ICONERROR);
