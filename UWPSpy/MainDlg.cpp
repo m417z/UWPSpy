@@ -145,6 +145,10 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
     } else if (auto nativeSource =
                    element.try_as<IDesktopWindowXamlSourceNative_WinUI>()) {
         nativeSource->get_WindowHandle(&nativeWnd.m_hWnd);
+    } else if (auto uiElement = element.try_as<mux::UIElement>()) {
+        auto appWindowId =
+            uiElement.XamlRoot().ContentIslandEnvironment().AppWindowId();
+        nativeWnd = winrt::Microsoft::UI::GetWindowFromWindowId(appWindowId);
     }
 
     if (nativeWnd) {
@@ -155,7 +159,8 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
         }
 
         CRect rectWithDpi;
-        nativeWnd.GetWindowRect(rectWithDpi);
+        nativeWnd.GetClientRect(rectWithDpi);
+        nativeWnd.MapWindowPoints(nullptr, &rectWithDpi);
 
         UINT dpi = ::GetDpiForWindow(nativeWnd);
         CRect rect;
@@ -530,9 +535,28 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
         }
 
         CWindow rootWnd;
-        auto rootElementRect = GetRootElementRect(rootElement, &rootWnd.m_hWnd);
-        if (!rootElementRect) {
-            continue;
+        CRect rootElementRect;
+        if (auto rect = GetRootElementRect(rootElement, &rootWnd.m_hWnd)) {
+            rootElementRect = *rect;
+        } else {
+            // Ugly fallback: If the above didn't work, get the first child and
+            // try to get the XamlRoot from that.
+            auto childItem = item.GetChild();
+            if (childItem) {
+                auto childHandle =
+                    static_cast<InstanceHandle>(childItem.GetData());
+
+                wf::IInspectable rootChildElement;
+                HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
+                    childHandle, reinterpret_cast<::IInspectable**>(
+                                     winrt::put_abi(rootChildElement)));
+                if (SUCCEEDED(hr) && rootChildElement) {
+                    if (auto rect = GetRootElementRect(rootChildElement,
+                                                       &rootWnd.m_hWnd)) {
+                        rootElementRect = *rect;
+                    }
+                }
+            }
         }
 
         wux::UIElement wsubtree = nullptr;
@@ -588,12 +612,12 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
             ptWithoutDpi = pt;
         }
 
-        if (!rootElementRect->PtInRect(ptWithoutDpi)) {
+        if (!rootElementRect.PtInRect(ptWithoutDpi)) {
             continue;
         }
 
         CPoint ptWithoutDpiRelative = ptWithoutDpi;
-        ptWithoutDpiRelative.Offset(-rootElementRect->TopLeft());
+        ptWithoutDpiRelative.Offset(-rootElementRect.TopLeft());
 
         InstanceHandle foundHandle = 0;
         if (wsubtree) {
@@ -694,9 +718,13 @@ bool CMainDlg::CreateFlashArea(InstanceHandle handle) {
     }
 
     CWindow rootWnd;
-    auto rootElementRect = GetRootElementRect(rootElement, &rootWnd.m_hWnd);
-    if (!rootElementRect) {
-        return false;
+    CRect rootElementRect;
+    if (auto rect = GetRootElementRect(rootElement, &rootWnd.m_hWnd)) {
+        rootElementRect = *rect;
+    } else if (element) {
+        if (auto rect = GetRootElementRect(element, &rootWnd.m_hWnd)) {
+            rootElementRect = *rect;
+        }
     }
 
     CRect rect;
@@ -707,7 +735,7 @@ bool CMainDlg::CreateFlashArea(InstanceHandle handle) {
         }
 
         rect = *elementRect;
-        rect.OffsetRect(rootElementRect->TopLeft());
+        rect.OffsetRect(rootElementRect.TopLeft());
     } else {
         rect = *rootElementRect;
     }
