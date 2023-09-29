@@ -130,8 +130,7 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
         rect.bottom = rect.top + std::lroundf(bounds->Height);
 
         if (outWnd && coreWindow) {
-            if (const auto coreInterop =
-                    coreWindow.try_as<ICoreWindowInterop>()) {
+            if (auto coreInterop = coreWindow.try_as<ICoreWindowInterop>()) {
                 coreInterop->get_WindowHandle(outWnd);
             }
         }
@@ -142,12 +141,9 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
     CWindow nativeWnd;
     if (auto nativeSource = element.try_as<IDesktopWindowXamlSourceNative>()) {
         nativeSource->get_WindowHandle(&nativeWnd.m_hWnd);
-    } else if (auto nativeSource =
-                   element.try_as<IDesktopWindowXamlSourceNative_WinUI>()) {
-        nativeSource->get_WindowHandle(&nativeWnd.m_hWnd);
-    } else if (auto uiElement = element.try_as<mux::UIElement>()) {
-        auto appWindowId =
-            uiElement.XamlRoot().ContentIslandEnvironment().AppWindowId();
+    } else if (auto desktopWindowXamlSource =
+                   element.try_as<mux::Hosting::DesktopWindowXamlSource>()) {
+        auto appWindowId = desktopWindowXamlSource.SiteBridge().WindowId();
         nativeWnd = winrt::Microsoft::UI::GetWindowFromWindowId(appWindowId);
     }
 
@@ -538,25 +534,6 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
         CRect rootElementRect;
         if (auto rect = GetRootElementRect(rootElement, &rootWnd.m_hWnd)) {
             rootElementRect = *rect;
-        } else {
-            // Ugly fallback: If the above didn't work, get the first child and
-            // try to get the XamlRoot from that.
-            auto childItem = item.GetChild();
-            if (childItem) {
-                auto childHandle =
-                    static_cast<InstanceHandle>(childItem.GetData());
-
-                wf::IInspectable rootChildElement;
-                HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
-                    childHandle, reinterpret_cast<::IInspectable**>(
-                                     winrt::put_abi(rootChildElement)));
-                if (SUCCEEDED(hr) && rootChildElement) {
-                    if (auto rect = GetRootElementRect(rootChildElement,
-                                                       &rootWnd.m_hWnd)) {
-                        rootElementRect = *rect;
-                    }
-                }
-            }
         }
 
         wux::UIElement wsubtree = nullptr;
@@ -574,28 +551,6 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
                        rootElement
                            .try_as<mux::Hosting::DesktopWindowXamlSource>()) {
             msubtree = desktopWindowXamlSource.Content();
-        } else {
-            // Ugly fallback: If the above didn't work, get the first child and
-            // try to get the XamlRoot from that.
-            auto childItem = item.GetChild();
-            if (childItem) {
-                auto childHandle =
-                    static_cast<InstanceHandle>(childItem.GetData());
-
-                wf::IInspectable rootChildElement;
-                HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
-                    childHandle, reinterpret_cast<::IInspectable**>(
-                                     winrt::put_abi(rootChildElement)));
-                if (SUCCEEDED(hr) && rootChildElement) {
-                    if (auto uiElement =
-                            rootChildElement.try_as<wux::UIElement>()) {
-                        wsubtree = uiElement.XamlRoot().Content();
-                    } else if (auto uiElement =
-                                   rootChildElement.try_as<mux::UIElement>()) {
-                        msubtree = uiElement.XamlRoot().Content();
-                    }
-                }
-            }
         }
 
         if (!wsubtree && !msubtree) {
@@ -721,10 +676,6 @@ bool CMainDlg::CreateFlashArea(InstanceHandle handle) {
     CRect rootElementRect;
     if (auto rect = GetRootElementRect(rootElement, &rootWnd.m_hWnd)) {
         rootElementRect = *rect;
-    } else if (element) {
-        if (auto rect = GetRootElementRect(element, &rootWnd.m_hWnd)) {
-            rootElementRect = *rect;
-        }
     }
 
     CRect rect;
