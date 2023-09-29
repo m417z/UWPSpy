@@ -75,6 +75,22 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
         return false;
     }
 
+    using isDebugging_proc_t = BOOL(WINAPI*)(DWORD pid);
+
+    isDebugging_proc_t isDebugging =
+        (isDebugging_proc_t)GetProcAddress(lib, "isDebugging");
+    if (isDebugging && isDebugging(pid)) {
+        PCWSTR warningMsg =
+            L"UWPSpy is already inspecting the target process. To start a new "
+            L"inspection session, relaunch the target application.\n"
+            L"\n"
+            L"Resume the existing inspection session?";
+        if (MessageBox(hWnd, warningMsg, L"Warning",
+                       MB_ICONWARNING | MB_YESNO) == IDNO) {
+            return false;
+        }
+    }
+
     using start_proc_t = HRESULT(WINAPI*)(DWORD pid, DWORD framework);
 
     start_proc_t start = (start_proc_t)GetProcAddress(lib, "start");
@@ -99,7 +115,8 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
                 break;
 
             case kFrameworkWinUI:
-                if (hr == HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND)) {
+                if (hr == HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND) ||
+                    hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND)) {
                     message +=
                         L"\n\nMake sure that the target process is a WinUI 3 "
                         L"application.";

@@ -3,3 +3,4 @@ EXPORTS
     DllGetClassObject PRIVATE
     DllCanUnloadNow PRIVATE
     start @1
+    isDebugging @2

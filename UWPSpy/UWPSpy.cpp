@@ -179,3 +179,35 @@ HRESULT WINAPI start(DWORD pid, DWORD framework) {
 
     return E_INVALIDARG;
 }
+
+BOOL WINAPI isDebugging(DWORD pid) {
+    struct EnumWindowsData {
+        DWORD pid;
+        BOOL found;
+    };
+
+    EnumWindowsData data = {pid, FALSE};
+
+    EnumWindows(
+        [](HWND hWnd, LPARAM lParam) -> BOOL {
+            EnumWindowsData& data = *reinterpret_cast<EnumWindowsData*>(lParam);
+
+            DWORD windowPid;
+            if (!GetWindowThreadProcessId(hWnd, &windowPid) ||
+                windowPid != data.pid) {
+                return TRUE;
+            }
+
+            WCHAR windowClass[16];
+            if (!GetClassName(hWnd, windowClass, ARRAYSIZE(windowClass)) ||
+                _wcsicmp(windowClass, L"UWPSpy") != 0) {
+                return TRUE;
+            }
+
+            data.found = TRUE;
+            return FALSE;
+        },
+        reinterpret_cast<LPARAM>(&data));
+
+    return data.found;
+}
