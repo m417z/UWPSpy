@@ -80,6 +80,39 @@ int GetRequiredComboDroppedWidth(CComboBox rCombo) {
     return dx;
 }
 
+// Can be carefully used to pass a guid of a different version of an interface,
+// and use the resulting object with functions that are the same in both
+// interface versions.
+template <typename To,
+          typename From,
+          std::enable_if_t<winrt::impl::is_com_interface_v<To>, int> = 0>
+winrt::impl::com_ref<To> try_as_with_guid_unsafe(From* ptr,
+                                                 winrt::guid guid) noexcept {
+    if (!ptr) {
+        return nullptr;
+    }
+
+    void* result{};
+    ptr->QueryInterface(guid, &result);
+    return winrt::impl::wrap_as_result<To>(result);
+}
+
+// 1.2.220727.1-experimental1 - 1.2.220909.2-experimental2
+// {A81014CD-55C1-506E-AA79-D9AC96DB9B8E}
+constexpr winrt::guid IID_IDesktopWindowXamlSource_WinUI_1{
+    0xa81014cd,
+    0x55c1,
+    0x506e,
+    {0xaa, 0x79, 0xd9, 0xac, 0x96, 0xdb, 0x9b, 0x8e}};
+
+// 1.3.230202101-experimental1 - 1.4.230518007-experimental1
+// {F2AA238F-1C21-581E-AADC-7D6EC5320F56}
+constexpr winrt::guid IID_IDesktopWindowXamlSource_WinUI_2{
+    0xf2aa238f,
+    0x1c21,
+    0x581e,
+    {0xaa, 0xdc, 0x7d, 0x6e, 0xc5, 0x32, 0x0f, 0x56}};
+
 std::optional<CRect> GetRelativeElementRect(wf::IInspectable element) {
     std::optional<wf::Point> offset;
     std::optional<wf::Numerics::float2> size;
@@ -145,6 +178,15 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
                    element.try_as<mux::Hosting::DesktopWindowXamlSource>()) {
         auto appWindowId = desktopWindowXamlSource.SiteBridge().WindowId();
         nativeWnd = winrt::Microsoft::UI::GetWindowFromWindowId(appWindowId);
+    } else if (auto desktopWindowXamlSource = try_as_with_guid_unsafe<
+                   mux::Hosting::DesktopWindowXamlSource>(
+                   reinterpret_cast<::IInspectable*>(winrt::get_abi(element)),
+                   IID_IDesktopWindowXamlSource_WinUI_2)) {
+        auto appWindowId = desktopWindowXamlSource.SiteBridge().WindowId();
+        nativeWnd = winrt::Microsoft::UI::GetWindowFromWindowId(appWindowId);
+    } else if (auto nativeSource =
+                   element.try_as<IDesktopWindowXamlSourceNative_WinUI>()) {
+        nativeSource->get_WindowHandle(&nativeWnd.m_hWnd);
     }
 
     if (nativeWnd) {
@@ -550,6 +592,18 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
         } else if (auto desktopWindowXamlSource =
                        rootElement
                            .try_as<mux::Hosting::DesktopWindowXamlSource>()) {
+            msubtree = desktopWindowXamlSource.Content();
+        } else if (auto desktopWindowXamlSource = try_as_with_guid_unsafe<
+                       mux::Hosting::DesktopWindowXamlSource>(
+                       reinterpret_cast<::IInspectable*>(
+                           winrt::get_abi(rootElement)),
+                       IID_IDesktopWindowXamlSource_WinUI_2)) {
+            msubtree = desktopWindowXamlSource.Content();
+        } else if (auto desktopWindowXamlSource = try_as_with_guid_unsafe<
+                       mux::Hosting::DesktopWindowXamlSource>(
+                       reinterpret_cast<::IInspectable*>(
+                           winrt::get_abi(rootElement)),
+                       IID_IDesktopWindowXamlSource_WinUI_1)) {
             msubtree = desktopWindowXamlSource.Content();
         }
 

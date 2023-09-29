@@ -67,6 +67,8 @@ extern CAppModule _Module;
 
 // WinUI
 
+#include "winui/microsoft.ui.xaml.hosting.desktopwindowxamlsource_winui.h"
+
 #include <winrt/microsoft.ui.content.h>
 #include <winrt/microsoft.ui.interop.h>
 #include <winrt/microsoft.ui.xaml.h>
