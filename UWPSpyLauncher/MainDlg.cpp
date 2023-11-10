@@ -40,6 +40,15 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     return TRUE;
 }
 
+void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
+    switch (nIDEvent) {
+        case TIMER_ID_END_DIALOG:
+            KillTimer(nIDEvent);
+            EndDialog(0);
+            break;
+    }
+}
+
 void CMainDlg::OnOK(UINT uNotifyCode, int nID, CWindow wndCtl) {
     int selectedIndex = m_processListSort.GetSelectedIndex();
     if (selectedIndex == -1) {
@@ -208,6 +217,10 @@ void CMainDlg::ProcessSpyFromList(int index) {
     }
 
     if (ProcessSpy(m_hWnd, pid, framework)) {
-        EndDialog(0);
+        // EndDialog(0);
+
+        // Starting with Windows 11 build 22621.2506, closing the window right
+        // away makes the inspection fail. Use a timer as a workaround.
+        SetTimer(TIMER_ID_END_DIALOG, 0);
     }
 }
