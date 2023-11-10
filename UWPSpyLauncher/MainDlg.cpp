@@ -22,6 +22,18 @@ void OpenUrl(HWND hWnd, PCWSTR url) {
 
 }  // namespace
 
+void CSortListViewCtrlCustom::ProcessListOnChar(TCHAR chChar,
+                                                UINT nRepCnt,
+                                                UINT nFlags) {
+    if (chChar == 4) {
+        // Ctrl+D.
+        GetParent().SendMessage(
+            CMainDlg::UWM_SELECT_PROCESS_IN_LIST_FROM_CURSOR);
+    } else {
+        SetMsgHandled(FALSE);
+    }
+}
+
 BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     CenterWindow();
 
@@ -109,6 +121,33 @@ LRESULT CMainDlg::OnListDblClk(LPNMHDR pnmh) {
     }
 
     ProcessSpyFromList(lpnmitem->iItem);
+
+    return 0;
+}
+
+LRESULT CMainDlg::SelectProcessInListFromCursor(UINT uMsg,
+                                                WPARAM wParam,
+                                                LPARAM lParam) {
+    POINT pt;
+    GetCursorPos(&pt);
+    CWindow wnd = ::WindowFromPoint(pt);
+    if (!wnd) {
+        return 0;
+    }
+
+    DWORD pid = wnd.GetWindowProcessID();
+
+    CListViewCtrl list(GetDlgItem(IDC_PROCESS_LIST));
+    int itemCount = list.GetItemCount();
+    for (int i = 0; i < itemCount; i++) {
+        DWORD itemPid = static_cast<DWORD>(list.GetItemData(i));
+        if (itemPid == pid) {
+            list.SetItemState(i, LVIS_FOCUSED | LVIS_SELECTED,
+                              LVIS_FOCUSED | LVIS_SELECTED);
+            list.EnsureVisible(i, FALSE);
+            break;
+        }
+    }
 
     return 0;
 }

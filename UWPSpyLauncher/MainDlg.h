@@ -2,12 +2,25 @@
 
 #include "resource.h"
 
+class CSortListViewCtrlCustom : public CSortListViewCtrl {
+    BEGIN_MSG_MAP(CSortListViewCtrlCustom)
+        MSG_WM_CHAR(ProcessListOnChar)
+        CHAIN_MSG_MAP(CSortListViewCtrl)
+    END_MSG_MAP()
+
+    void ProcessListOnChar(TCHAR chChar, UINT nRepCnt, UINT nFlags);
+};
+
 class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
    public:
     enum { IDD = IDD_MAINDLG };
 
     enum {
         TIMER_ID_END_DIALOG = 1,
+    };
+
+    enum {
+        UWM_SELECT_PROCESS_IN_LIST_FROM_CURSOR = WM_APP,
     };
 
     BEGIN_DLGRESIZE_MAP(CMainDlg)
@@ -32,6 +45,8 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         COMMAND_ID_HANDLER_EX(ID_APP_ABOUT, OnAppAbout)
         COMMAND_ID_HANDLER_EX(IDCANCEL, OnCancel)
         NOTIFY_HANDLER_EX(IDC_PROCESS_LIST, NM_DBLCLK, OnListDblClk)
+        MESSAGE_HANDLER_EX(UWM_SELECT_PROCESS_IN_LIST_FROM_CURSOR,
+                           SelectProcessInListFromCursor)
     END_MSG_MAP()
 
     BOOL OnInitDialog(CWindow wndFocus, LPARAM lInitParam);
@@ -41,11 +56,14 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnCancel(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnListDblClk(LPNMHDR pnmh);
+    LRESULT SelectProcessInListFromCursor(UINT uMsg,
+                                          WPARAM wParam,
+                                          LPARAM lParam);
 
     void InitProcessList();
     void LoadProcessList();
     void ProcessSpyFromList(int index);
 
     CIcon m_icon, m_smallIcon;
-    CSortListViewCtrl m_processListSort;
+    CSortListViewCtrlCustom m_processListSort;
 };
