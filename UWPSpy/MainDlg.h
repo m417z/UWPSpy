@@ -44,6 +44,8 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_SELCHANGED,
                           OnElementTreeSelChanged)
         COMMAND_ID_HANDLER_EX(IDC_SPLIT_TOGGLE, OnSplitToggle)
+        NOTIFY_HANDLER_EX(IDC_DETAILS_TABS, TCN_SELCHANGE,
+                          OnDetailsTabsSelChange)
         NOTIFY_HANDLER_EX(IDC_ATTRIBUTE_LIST, NM_DBLCLK, OnAttributeListDblClk)
         COMMAND_HANDLER_EX(IDC_PROPERTY_NAME, CBN_SELCHANGE,
                            OnPropertyNameSelChange)
@@ -74,7 +76,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_NAME_EDIT, DLSZ_MOVE_X | DLSZ_SIZE_X)
             DLGRESIZE_CONTROL(IDC_RECT_STATIC, DLSZ_MOVE_X)
             DLGRESIZE_CONTROL(IDC_RECT_EDIT, DLSZ_MOVE_X)
+            DLGRESIZE_CONTROL(IDC_DETAILS_TABS, DLSZ_MOVE_X)
             DLGRESIZE_CONTROL(IDC_ATTRIBUTE_LIST, DLSZ_MOVE_X | DLSZ_SIZE_Y)
+            DLGRESIZE_CONTROL(IDC_VISUAL_STATE_TREE, DLSZ_MOVE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_NAME, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_VALUE, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_REMOVE, DLSZ_MOVE_X | DLSZ_MOVE_Y)
@@ -98,7 +102,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_NAME_EDIT, DLSZ_SIZE_X)
             DLGRESIZE_CONTROL(IDC_RECT_STATIC, 0)
             DLGRESIZE_CONTROL(IDC_RECT_EDIT, DLSZ_SIZE_X)
+            DLGRESIZE_CONTROL(IDC_DETAILS_TABS, DLSZ_SIZE_X)
             DLGRESIZE_CONTROL(IDC_ATTRIBUTE_LIST, DLSZ_SIZE_X | DLSZ_SIZE_Y)
+            DLGRESIZE_CONTROL(IDC_VISUAL_STATE_TREE, DLSZ_SIZE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_NAME, DLSZ_SIZE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_VALUE, DLSZ_SIZE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_REMOVE, DLSZ_MOVE_X | DLSZ_MOVE_Y)
@@ -129,6 +135,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnContextMenu(CWindow wnd, CPoint point);
     LRESULT OnElementTreeSelChanged(LPNMHDR pnmh);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
+    LRESULT OnDetailsTabsSelChange(LPNMHDR pnmh);
     LRESULT OnAttributeListDblClk(LPNMHDR pnmh);
     void OnPropertyNameSelChange(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl);
@@ -151,6 +158,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     bool RefreshSelectedElementInformation(UINT delay = 20);
     void ResetAttributesListColumns();
     void PopulateAttributesList(InstanceHandle handle);
+    void PopulateVisualStatesTree(InstanceHandle handle);
     void AddItemToTree(HTREEITEM parentTreeItem,
                        HTREEITEM insertAfter,
                        InstanceHandle handle,

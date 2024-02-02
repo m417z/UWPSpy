@@ -417,11 +417,36 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     treeView.SetExtendedStyle(TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
     ::SetWindowTheme(treeView, L"Explorer", nullptr);
 
+    auto detailsTabs = CTabCtrl(GetDlgItem(IDC_DETAILS_TABS));
+    detailsTabs.InsertItem(0, L"Attributes");
+    detailsTabs.InsertItem(1, L"Visual states");
+    CRect detailsTabsRect;
+    detailsTabs.GetWindowRect(&detailsTabsRect);
+    ::MapWindowPoints(nullptr, m_hWnd,
+                      reinterpret_cast<POINT*>(&detailsTabsRect),
+                      sizeof(RECT) / sizeof(POINT));
+
     auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
     attributesList.SetExtendedListViewStyle(
         LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
     ::SetWindowTheme(attributesList, L"Explorer", nullptr);
     ResetAttributesListColumns();
+    RECT attributesListRect = {};
+    attributesList.GetWindowRect(&attributesListRect);
+    ::MapWindowPoints(nullptr, m_hWnd,
+                      reinterpret_cast<POINT*>(&attributesListRect),
+                      sizeof(RECT) / sizeof(POINT));
+    attributesListRect.top = detailsTabsRect.bottom;
+    // Height will be adjusted automatically.
+    attributesListRect.bottom = attributesListRect.top;
+    attributesList.SetWindowPos(nullptr, &attributesListRect,
+                                SWP_NOZORDER | SWP_NOACTIVATE);
+
+    auto visualStatesTree = CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
+    visualStatesTree.SetExtendedStyle(TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
+    ::SetWindowTheme(visualStatesTree, L"Explorer", nullptr);
+    visualStatesTree.SetWindowPos(nullptr, &attributesListRect,
+                                  SWP_NOZORDER | SWP_NOACTIVATE);
 
     CButton(GetDlgItem(IDC_HIGHLIGHT_SELECTION))
         .SetCheck(m_highlightSelection ? BST_CHECKED : BST_UNCHECKED);
@@ -810,7 +835,7 @@ void CMainDlg::OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl) {
 
     // Below is a very ugly hack to switch to another DlgResize layout.
 
-    RECT rectDlg = {};
+    CRect rectDlg;
     GetClientRect(&rectDlg);
 
     SetWindowPos(nullptr, 0, 0, m_sizeDialog.cx, m_sizeDialog.cy,
@@ -819,6 +844,19 @@ void CMainDlg::OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl) {
     DlgResize_Init();
 
     ResizeClient(rectDlg.right, rectDlg.bottom);
+}
+
+LRESULT CMainDlg::OnDetailsTabsSelChange(LPNMHDR pnmh) {
+    auto detailsTabs = CTabCtrl(GetDlgItem(IDC_DETAILS_TABS));
+    int index = detailsTabs.GetCurSel();
+
+    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    attributesList.ShowWindow(index == 0 ? SW_SHOW : SW_HIDE);
+
+    auto visualStatesList = CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
+    visualStatesList.ShowWindow(index == 1 ? SW_SHOW : SW_HIDE);
+
+    return 0;
 }
 
 LRESULT CMainDlg::OnAttributeListDblClk(LPNMHDR pnmh) {
@@ -1090,6 +1128,10 @@ bool CMainDlg::SetSelectedElementInformation() {
         auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
         attributesList.DeleteAllItems();
 
+        auto visualStatesTree =
+            CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
+        visualStatesTree.DeleteAllItems();
+
         auto propertiesComboBox = CComboBox(GetDlgItem(IDC_PROPERTY_NAME));
         propertiesComboBox.ResetContent();
 
@@ -1155,9 +1197,14 @@ bool CMainDlg::SetSelectedElementInformation() {
 
     if (hasParent) {
         PopulateAttributesList(handle);
+        PopulateVisualStatesTree(handle);
     } else {
         auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
         attributesList.DeleteAllItems();
+
+        auto visualStatesTree =
+            CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
+        visualStatesTree.DeleteAllItems();
 
         auto propertiesComboBox = CComboBox(GetDlgItem(IDC_PROPERTY_NAME));
         propertiesComboBox.ResetContent();
@@ -1427,6 +1474,79 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
     CoTaskMemFree(pPropertyValues);
 
     attributesList.SetRedraw(TRUE);
+}
+
+void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
+    auto visualStatesTree = CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
+    visualStatesTree.SetRedraw(FALSE);
+
+    visualStatesTree.DeleteAllItems();
+
+    try {
+        wf::IInspectable element;
+        winrt::check_hresult(m_xamlDiagnostics->GetIInspectableFromHandle(
+            handle,
+            reinterpret_cast<::IInspectable**>(winrt::put_abi(element))));
+        if (!element) {
+            throw std::runtime_error("Element can't be retrieved");
+        }
+
+        auto wuiFrameworkElement = element.try_as<wux::FrameworkElement>();
+        auto muiFrameworkElement =
+            wuiFrameworkElement ? mux::FrameworkElement{nullptr}
+                                : element.try_as<mux::FrameworkElement>();
+
+        auto populateList = [&visualStatesTree](auto visualStateGroups) {
+            for (const auto& group : visualStateGroups) {
+                auto groupName = group.Name();
+                if (groupName.empty()) {
+                    groupName = L"(unnamed)";
+                }
+
+                auto currentState = group.CurrentState();
+
+                auto groupItem = visualStatesTree.InsertItem(
+                    groupName.c_str(), TVI_ROOT, TVI_LAST);
+
+                for (auto state : group.States()) {
+                    std::wstring name(state.Name());
+                    if (name.empty()) {
+                        name = L"(unnamed)";
+                    }
+
+                    if (state == currentState) {
+                        name += L" (current)";
+                    }
+
+                    visualStatesTree.InsertItem(name.c_str(), groupItem,
+                                                TVI_LAST);
+                }
+
+                groupItem.Expand();
+            }
+        };
+
+        if (wuiFrameworkElement) {
+            auto visualStateGroups =
+                wux::VisualStateManager::GetVisualStateGroups(
+                    wuiFrameworkElement);
+            populateList(visualStateGroups);
+        } else if (muiFrameworkElement) {
+            auto visualStateGroups =
+                mux::VisualStateManager::GetVisualStateGroups(
+                    muiFrameworkElement);
+            populateList(visualStateGroups);
+        }
+    } catch (...) {
+        HRESULT hr = winrt::to_hresult();
+        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        visualStatesTree.InsertItem(errorMsg.c_str(), TVI_ROOT, TVI_LAST);
+
+        visualStatesTree.SetRedraw(TRUE);
+        return;
+    }
+
+    visualStatesTree.SetRedraw(TRUE);
 }
 
 void CMainDlg::AddItemToTree(HTREEITEM parentTreeItem,
