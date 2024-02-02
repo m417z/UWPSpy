@@ -374,14 +374,15 @@ HWND FlashArea(HWND hParentWnd, HMODULE hModule, const RECT& rc) {
     HWND hwnd;
 
     if (!fInitializedWindowClass) {
-        WNDCLASSEX wc = {0};
+        WNDCLASSEX wc = {sizeof(wc)};
 
-        wc.cbSize = sizeof(wc);
         wc.style = 0;
         wc.lpszClassName = WC_FLASHWINDOW;
         wc.lpfnWndProc = DefWindowProc;
 
         RegisterClassEx(&wc);
+
+        fInitializedWindowClass = TRUE;
     }
 
     hwnd = CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
