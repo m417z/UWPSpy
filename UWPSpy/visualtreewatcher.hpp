@@ -3,9 +3,10 @@
 #include "MainDlg.h"
 #include "winrt.hpp"
 
-struct VisualTreeWatcher : winrt::implements<VisualTreeWatcher,
-                                             IVisualTreeServiceCallback2,
-                                             winrt::non_agile> {
+class VisualTreeWatcher : public winrt::implements<VisualTreeWatcher,
+                                                   IVisualTreeServiceCallback2,
+                                                   winrt::non_agile> {
+   public:
     VisualTreeWatcher(winrt::com_ptr<IUnknown> site);
 
     void Activate();
@@ -17,6 +18,9 @@ struct VisualTreeWatcher : winrt::implements<VisualTreeWatcher,
     VisualTreeWatcher& operator=(VisualTreeWatcher&&) = delete;
 
     ~VisualTreeWatcher();
+
+    void AdviseVisualTreeChange();
+    void UnadviseVisualTreeChange();
 
    private:
     HRESULT STDMETHODCALLTYPE
@@ -38,10 +42,16 @@ struct VisualTreeWatcher : winrt::implements<VisualTreeWatcher,
     }
 
     CMainDlg* DlgMainForCurrentThread();
+    void OnDlgMainEvent(HWND hWnd, CMainDlg::EventId eventId);
+    void OnDlgMainHidden(HWND hWnd);
     void OnDlgMainFinalMessage(HWND hWnd);
+    void UnloadIfNoMoreVisibleDlgs();
 
+    winrt::com_ptr<VisualTreeWatcher> m_selfPtr;
     winrt::com_ptr<IXamlDiagnostics> m_xamlDiagnostics;
 
     std::shared_mutex m_dlgMainMutex;
     std::unordered_map<DWORD, CMainDlg> m_dlgMainForEachThread;
+
+    std::atomic<bool> m_unloading = false;
 };

@@ -223,17 +223,21 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
 }  // namespace
 
 CMainDlg::CMainDlg(winrt::com_ptr<IXamlDiagnostics> diagnostics,
-                   void* callbacksParam)
+                   OnEventCallback_t eventCallback)
     : m_elementTree(this, 1),
       m_visualTreeService(diagnostics.as<IVisualTreeService3>()),
       m_xamlDiagnostics(std::move(diagnostics)),
-      m_callbacksParam(callbacksParam) {}
+      m_eventCallback(std::move(eventCallback)) {}
 
 void CMainDlg::Hide() {
     ShowWindow(SW_HIDE);
 
     if (m_flashAreaWindow) {
         m_flashAreaWindow.ShowWindow(SW_HIDE);
+    }
+
+    if (m_eventCallback) {
+        m_eventCallback(m_hWnd, EventId::Hidden);
     }
 }
 
@@ -242,6 +246,10 @@ void CMainDlg::Show() {
 
     if (m_flashAreaWindow) {
         m_flashAreaWindow.ShowWindow(SW_SHOW);
+    }
+
+    if (m_eventCallback) {
+        m_eventCallback(m_hWnd, EventId::Shown);
     }
 }
 
@@ -382,10 +390,6 @@ void CMainDlg::ElementRemoved(InstanceHandle handle) {
     m_elementItems.erase(it);
 }
 
-void CMainDlg::SetOnFinalMessageCallback(OnFinalMessageCallback_t callback) {
-    m_onFinalMessageCallback = callback;
-}
-
 BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     // Center the dialog on the screen.
     CenterWindow();
@@ -431,9 +435,8 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
 void CMainDlg::OnDestroy() {}
 
 void CMainDlg::OnFinalMessage(HWND hWnd) {
-    auto onFinalMessageCallback = *m_onFinalMessageCallback;
-    if (onFinalMessageCallback) {
-        onFinalMessageCallback(m_callbacksParam, hWnd);
+    if (m_eventCallback) {
+        m_eventCallback(hWnd, EventId::FinalMessage);
     }
 }
 

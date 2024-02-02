@@ -31,9 +31,12 @@ ULONG_PTR EnableVisualStyles() {
 }  // namespace
 
 VisualTreeWatcher::VisualTreeWatcher(winrt::com_ptr<IUnknown> site)
-    : m_xamlDiagnostics(site.as<IXamlDiagnostics>()) {
-    // const auto treeService = m_xamlDiagnostics.as<IVisualTreeService3>();
-    // winrt::check_hresult(treeService->AdviseVisualTreeChange(this));
+    : m_selfPtr(this, winrt::take_ownership_from_abi_t{}),
+      m_xamlDiagnostics(site.as<IXamlDiagnostics>()) {
+    // For m_selfPtr.
+    this->AddRef();
+
+    // AdviseVisualTreeChange();
 
     // Calling AdviseVisualTreeChange from the current thread causes the app to
     // hang on Windows 10 in Advising::RunOnUIThread. Creating a new thread and
@@ -42,9 +45,7 @@ VisualTreeWatcher::VisualTreeWatcher(winrt::com_ptr<IUnknown> site)
         nullptr, 0,
         [](LPVOID lpParam) -> DWORD {
             auto watcher = reinterpret_cast<VisualTreeWatcher*>(lpParam);
-            const auto treeService =
-                watcher->m_xamlDiagnostics.as<IVisualTreeService3>();
-            winrt::check_hresult(treeService->AdviseVisualTreeChange(watcher));
+            watcher->AdviseVisualTreeChange();
             return 0;
         },
         this, 0, nullptr);
@@ -62,11 +63,36 @@ void VisualTreeWatcher::Activate() {
 }
 
 VisualTreeWatcher::~VisualTreeWatcher() {
-    std::shared_lock lock(m_dlgMainMutex);
+    while (true) {
+        HWND hWnd = nullptr;
 
-    for (auto& [threadId, dlgMain] : m_dlgMainForEachThread) {
-        dlgMain.SendMessage(CMainDlg::UWM_DESTROY_WINDOW);
+        {
+            std::shared_lock lock(m_dlgMainMutex);
+
+            if (!m_dlgMainForEachThread.empty()) {
+                hWnd = m_dlgMainForEachThread.begin()->second;
+            }
+        }
+
+        if (!hWnd) {
+            break;
+        }
+
+        if (!SendMessage(hWnd, CMainDlg::UWM_DESTROY_WINDOW, 0, 0)) {
+            ATLASSERT(FALSE);
+        }
     }
+}
+
+void VisualTreeWatcher::AdviseVisualTreeChange() {
+    const auto treeService = m_xamlDiagnostics.as<IVisualTreeService3>();
+    winrt::check_hresult(treeService->AdviseVisualTreeChange(this));
+}
+
+void VisualTreeWatcher::UnadviseVisualTreeChange() {
+    const auto treeService = m_xamlDiagnostics.as<IVisualTreeService3>();
+    winrt::check_hresult(treeService->UnadviseVisualTreeChange(this));
+    m_selfPtr = nullptr;
 }
 
 HRESULT VisualTreeWatcher::OnVisualTreeChange(
@@ -210,7 +236,9 @@ CMainDlg* VisualTreeWatcher::DlgMainForCurrentThread() {
     std::unique_lock lock(m_dlgMainMutex);
 
     auto [it, inserted] = m_dlgMainForEachThread.try_emplace(
-        dwCurrentThreadId, m_xamlDiagnostics, this);
+        dwCurrentThreadId, m_xamlDiagnostics,
+        std::bind(&VisualTreeWatcher::OnDlgMainEvent, this,
+                  std::placeholders::_1, std::placeholders::_2));
 
     CMainDlg& dlgMain = it->second;
 
@@ -244,26 +272,71 @@ CMainDlg* VisualTreeWatcher::DlgMainForCurrentThread() {
         return nullptr;
     }
 
-    dlgMain.SetOnFinalMessageCallback([](void* param, HWND hWnd) {
-        reinterpret_cast<VisualTreeWatcher*>(param)->OnDlgMainFinalMessage(
-            hWnd);
-    });
-
     dlgMain.ShowWindow(SW_SHOWDEFAULT);
     SetForegroundWindow(dlgMain.m_hWnd);
     return &dlgMain;
 }
 
+void VisualTreeWatcher::OnDlgMainEvent(HWND hWnd, CMainDlg::EventId eventId) {
+    if (eventId == CMainDlg::EventId::Hidden) {
+        OnDlgMainHidden(hWnd);
+    } else if (eventId == CMainDlg::EventId::FinalMessage) {
+        OnDlgMainFinalMessage(hWnd);
+    }
+}
+
+void VisualTreeWatcher::OnDlgMainHidden(HWND hWnd) {
+    UnloadIfNoMoreVisibleDlgs();
+}
+
 void VisualTreeWatcher::OnDlgMainFinalMessage(HWND hWnd) {
     DWORD dwCurrentThreadId = GetCurrentThreadId();
 
-    std::unique_lock lock(m_dlgMainMutex);
+    {
+        std::unique_lock lock(m_dlgMainMutex);
 
-    auto it = m_dlgMainForEachThread.find(dwCurrentThreadId);
-    if (it == m_dlgMainForEachThread.end()) {
-        ATLASSERT(FALSE);
+        auto it = m_dlgMainForEachThread.find(dwCurrentThreadId);
+        if (it == m_dlgMainForEachThread.end()) {
+            ATLASSERT(FALSE);
+            return;
+        }
+
+        m_dlgMainForEachThread.erase(it);
+    }
+
+    UnloadIfNoMoreVisibleDlgs();
+}
+
+void VisualTreeWatcher::UnloadIfNoMoreVisibleDlgs() {
+    if (m_unloading) {
         return;
     }
 
-    m_dlgMainForEachThread.erase(it);
+    {
+        std::shared_lock lock(m_dlgMainMutex);
+
+        for (auto& [threadId, dlgMain] : m_dlgMainForEachThread) {
+            if (dlgMain.IsWindowVisible()) {
+                return;
+            }
+        }
+    }
+
+    if (m_unloading.exchange(true)) {
+        return;
+    }
+
+    // Unload in a new thread to avoid deadlocks and to be able to unload self.
+    HANDLE thread = CreateThread(
+        nullptr, 0,
+        [](LPVOID lpParam) -> DWORD {
+            auto watcher = reinterpret_cast<VisualTreeWatcher*>(lpParam);
+            watcher->UnadviseVisualTreeChange();
+            Sleep(100);
+            FreeLibraryAndExitThread(_Module.GetModuleInstance(), 0);
+        },
+        this, 0, nullptr);
+    if (thread) {
+        CloseHandle(thread);
+    }
 }

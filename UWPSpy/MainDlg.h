@@ -18,16 +18,21 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         UWM_DESTROY_WINDOW,
     };
 
-    using OnFinalMessageCallback_t = void (*)(void* param, HWND hWnd);
+    enum class EventId {
+        Shown,
+        Hidden,
+        FinalMessage,
+    };
+
+    using OnEventCallback_t = std::function<void(HWND hWnd, EventId eventId)>;
 
     CMainDlg(winrt::com_ptr<IXamlDiagnostics> diagnostics,
-             void* callbacksParam);
+             OnEventCallback_t eventCallback);
     void Hide();
     void Show();
     void ElementAdded(const ParentChildRelation& parentChildRelation,
                       const VisualElement& element);
     void ElementRemoved(InstanceHandle handle);
-    void SetOnFinalMessageCallback(OnFinalMessageCallback_t callback);
 
    private:
     BEGIN_MSG_MAP_EX(CMainDlg)
@@ -165,11 +170,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     bool m_redrawTreeQueued = false;
     bool m_redrawTreeQueuedEnsureSelectionVisible = false;
 
-    void* m_callbacksParam;
-    std::atomic<OnFinalMessageCallback_t> m_onFinalMessageCallback;
-
     winrt::com_ptr<IVisualTreeService3> m_visualTreeService;
     winrt::com_ptr<IXamlDiagnostics> m_xamlDiagnostics;
+    OnEventCallback_t m_eventCallback;
 
     std::unordered_map<InstanceHandle, ElementItem> m_elementItems;
 

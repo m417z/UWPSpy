@@ -82,7 +82,8 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
     if (isDebugging && isDebugging(pid)) {
         PCWSTR warningMsg =
             L"UWPSpy is already inspecting the target process. To start a new "
-            L"inspection session, relaunch the target application.\n"
+            L"inspection session, close all existing UWPSpy windows and try "
+            L"again.\n"
             L"\n"
             L"Resume the existing inspection session?";
         if (MessageBox(hWnd, warningMsg, L"Warning",

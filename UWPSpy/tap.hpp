@@ -10,14 +10,15 @@ static constexpr CLSID CLSID_UWPSpyTAP = {
     0x48ac,
     {0xbe, 0x31, 0xa5, 0x48, 0x5a, 0x74, 0x35, 0xe7}};
 
-struct ExplorerTAP
-    : winrt::implements<ExplorerTAP, IObjectWithSite, winrt::non_agile> {
+class ExplorerTAP
+    : public winrt::implements<ExplorerTAP, IObjectWithSite, winrt::non_agile> {
+   public:
     HRESULT STDMETHODCALLTYPE SetSite(IUnknown* pUnkSite) override;
     HRESULT STDMETHODCALLTYPE GetSite(REFIID riid,
                                       void** ppvSite) noexcept override;
 
    private:
-    static winrt::com_ptr<VisualTreeWatcher> s_VisualTreeWatcher;
+    static winrt::weak_ref<VisualTreeWatcher> s_VisualTreeWatcher;
 
     winrt::com_ptr<IUnknown> site;
 };

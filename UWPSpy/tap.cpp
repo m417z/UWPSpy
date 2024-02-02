@@ -2,12 +2,12 @@
 
 #include "tap.hpp"
 
-winrt::com_ptr<VisualTreeWatcher> ExplorerTAP::s_VisualTreeWatcher;
+winrt::weak_ref<VisualTreeWatcher> ExplorerTAP::s_VisualTreeWatcher;
 
 HRESULT ExplorerTAP::SetSite(IUnknown* pUnkSite) try {
     // Only ever 1 VTW at once.
-    if (s_VisualTreeWatcher.get()) {
-        s_VisualTreeWatcher->Activate();
+    if (auto visualTreeWatcher = s_VisualTreeWatcher.get()) {
+        visualTreeWatcher->Activate();
         throw winrt::hresult_illegal_method_call();
     }
 

@@ -17,10 +17,6 @@ manipulate UI elements and their properties in real time.
 - Run **UWPSpy.exe** and select the UWP/WinUI 3 application you want to spy on.
 - A window with the application's UI elements will appear for each UI thread of
   the target application.
-- A UWPSpy spying window can be closed, in which case it will become hidden. It
-  can be shown again by running **UWPSpy.exe** again and selecting the same
-  application.
-- To completely stop spying on an application, its process must be terminated.
 
 ## Demo
 
