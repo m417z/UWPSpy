@@ -1079,6 +1079,18 @@ bool CMainDlg::SetSelectedElementInformation() {
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
     auto selectedItem = treeView.GetSelectedItem();
     if (!selectedItem) {
+        SetDlgItemText(IDC_CLASS_EDIT, L"");
+        SetDlgItemText(IDC_NAME_EDIT, L"");
+        SetDlgItemText(IDC_RECT_EDIT, L"");
+
+        auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+        attributesList.DeleteAllItems();
+
+        auto propertiesComboBox = CComboBox(GetDlgItem(IDC_PROPERTY_NAME));
+        propertiesComboBox.ResetContent();
+
+        DestroyFlashArea();
+
         return false;
     }
 
