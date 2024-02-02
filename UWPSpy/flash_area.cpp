@@ -368,7 +368,7 @@ HBITMAP MakeFlashWindowBitmap(HMODULE hModule, RECT rc) {
     return ExpandNineGridImage(size, hbmBox, edges);
 }
 
-HWND FlashArea(HWND hParentWnd, HMODULE hModule, const RECT& rc) {
+HWND FlashArea(HWND hParentWnd, HMODULE hModule, const RECT& rc, bool show) {
     static BOOL fInitializedWindowClass = FALSE;
 
     HWND hwnd;
@@ -395,8 +395,12 @@ HWND FlashArea(HWND hParentWnd, HMODULE hModule, const RECT& rc) {
         UpdateLayeredWindowContent(hwnd, rc, hbmp, ALPHA_LEVEL);
         DeleteObject(hbmp);
 
-        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+        if (show) {
+            flags |= SWP_SHOWWINDOW;
+        }
+
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags);
     }
 
     return hwnd;

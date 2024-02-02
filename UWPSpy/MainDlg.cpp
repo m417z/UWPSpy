@@ -765,7 +765,8 @@ bool CMainDlg::CreateFlashArea(InstanceHandle handle) {
         return true;
     }
 
-    m_flashAreaWindow = FlashArea(m_hWnd, _Module.GetModuleInstance(), rect);
+    m_flashAreaWindow =
+        FlashArea(m_hWnd, _Module.GetModuleInstance(), rect, IsWindowVisible());
     if (!m_flashAreaWindow) {
         return false;
     }
