@@ -10,6 +10,7 @@
 #include <optional>
 #include <shared_mutex>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 

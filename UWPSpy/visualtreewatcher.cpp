@@ -6,6 +6,15 @@
 
 namespace {
 
+// https://devblogs.microsoft.com/oldnewthing/20240319-00/?p=109552
+template <typename T>
+std::enable_if_t<std::is_base_of_v<::IUnknown, T>, winrt::com_ptr<T>>
+make_com_ptr_from_copy(T* p) {
+    winrt::com_ptr<T> result;
+    result.copy_from(p);
+    return result;
+}
+
 // https://stackoverflow.com/a/10444161
 ULONG_PTR EnableVisualStyles() {
     TCHAR dir[MAX_PATH];
@@ -31,11 +40,8 @@ ULONG_PTR EnableVisualStyles() {
 }  // namespace
 
 VisualTreeWatcher::VisualTreeWatcher(winrt::com_ptr<IUnknown> site)
-    : m_selfPtr(this, winrt::take_ownership_from_abi_t{}),
+    : m_selfPtr(make_com_ptr_from_copy(this)),
       m_xamlDiagnostics(site.as<IXamlDiagnostics>()) {
-    // For m_selfPtr.
-    this->AddRef();
-
     // AdviseVisualTreeChange();
 
     // Calling AdviseVisualTreeChange from the current thread causes the app to
