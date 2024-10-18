@@ -49,10 +49,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         NOTIFY_HANDLER_EX(IDC_ATTRIBUTE_LIST, NM_DBLCLK, OnAttributeListDblClk)
         COMMAND_HANDLER_EX(IDC_PROPERTY_NAME, CBN_SELCHANGE,
                            OnPropertyNameSelChange)
+        COMMAND_ID_HANDLER_EX(IDC_PROPERTY_IS_XAML, OnPropertyIsXaml)
         COMMAND_ID_HANDLER_EX(IDC_PROPERTY_REMOVE, OnPropertyRemove)
         COMMAND_ID_HANDLER_EX(IDC_PROPERTY_SET, OnPropertySet)
         COMMAND_ID_HANDLER_EX(IDC_COLLAPSE_ALL, OnCollapseAll)
-        COMMAND_ID_HANDLER_EX(IDC_EXPAND_ALL, OnExpandAll)
         COMMAND_HANDLER_EX(IDC_HIGHLIGHT_SELECTION, BN_CLICKED,
                            OnHighlightSelection)
         COMMAND_HANDLER_EX(IDC_DETAILED_PROPERTIES, BN_CLICKED,
@@ -81,10 +81,12 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_VISUAL_STATE_TREE, DLSZ_MOVE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_NAME, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_VALUE, DLSZ_MOVE_X | DLSZ_MOVE_Y)
+            DLGRESIZE_CONTROL(IDC_PROPERTY_VALUE_XAML,
+                              DLSZ_MOVE_X | DLSZ_MOVE_Y)
+            DLGRESIZE_CONTROL(IDC_PROPERTY_IS_XAML, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_REMOVE, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_SET, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_COLLAPSE_ALL, DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_EXPAND_ALL, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_HIGHLIGHT_SELECTION, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_DETAILED_PROPERTIES, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(ID_APP_ABOUT, DLSZ_MOVE_X | DLSZ_MOVE_Y)
@@ -107,10 +109,12 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_VISUAL_STATE_TREE, DLSZ_SIZE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_NAME, DLSZ_SIZE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_VALUE, DLSZ_SIZE_X | DLSZ_MOVE_Y)
+            DLGRESIZE_CONTROL(IDC_PROPERTY_VALUE_XAML,
+                              DLSZ_SIZE_X | DLSZ_MOVE_Y)
+            DLGRESIZE_CONTROL(IDC_PROPERTY_IS_XAML, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_REMOVE, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_SET, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_COLLAPSE_ALL, DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_EXPAND_ALL, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_HIGHLIGHT_SELECTION, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_DETAILED_PROPERTIES, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(ID_APP_ABOUT, DLSZ_MOVE_X | DLSZ_MOVE_Y)
@@ -138,10 +142,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     LRESULT OnDetailsTabsSelChange(LPNMHDR pnmh);
     LRESULT OnAttributeListDblClk(LPNMHDR pnmh);
     void OnPropertyNameSelChange(UINT uNotifyCode, int nID, CWindow wndCtl);
+    void OnPropertyIsXaml(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl);
-    void OnExpandAll(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnHighlightSelection(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnDetailedProperties(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl);
@@ -172,6 +176,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     CIcon m_icon, m_smallIcon;
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;
+    bool m_listCollapsed = false;
     bool m_highlightSelection = true;
     bool m_detailedProperties = false;
     bool m_splitModeAttributesExpanded = false;

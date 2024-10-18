@@ -19,16 +19,18 @@
 #define IDC_VISUAL_STATE_TREE           1010
 #define IDC_PROPERTY_NAME               1011
 #define IDC_PROPERTY_VALUE              1012
-#define IDC_PROPERTY_REMOVE             1013
-#define IDC_PROPERTY_SET                1014
-#define IDC_COLLAPSE_ALL                1015
-#define IDC_EXPAND_ALL                  1016
-#define IDC_HIGHLIGHT_SELECTION         1017
-#define IDC_DETAILED_PROPERTIES         1018
-#define IDC_ABOUT_TITLE                 1019
-#define IDC_ABOUT_BUTTON_RAMEN_SOFTWARE 1020
-#define IDC_ABOUT_BUTTON_HOMEPAGE       1021
-#define IDC_ABOUT_BUTTON_SOURCE_CODE    1022
+#define IDC_PROPERTY_VALUE_XAML         1013
+#define IDC_PROPERTY_IS_XAML            1014
+#define IDC_PROPERTY_REMOVE             1015
+#define IDC_PROPERTY_SET                1016
+#define IDC_COLLAPSE_ALL                1017
+#define IDC_EXPAND_ALL                  1018
+#define IDC_HIGHLIGHT_SELECTION         1019
+#define IDC_DETAILED_PROPERTIES         1020
+#define IDC_ABOUT_TITLE                 1021
+#define IDC_ABOUT_BUTTON_RAMEN_SOFTWARE 1022
+#define IDC_ABOUT_BUTTON_HOMEPAGE       1023
+#define IDC_ABOUT_BUTTON_SOURCE_CODE    1024
 
 // Next default values for new objects
 // 
@@ -36,7 +38,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        204
 #define _APS_NEXT_COMMAND_VALUE         32775
-#define _APS_NEXT_CONTROL_VALUE         1023
+#define _APS_NEXT_CONTROL_VALUE         1025
 #define _APS_NEXT_SYMED_VALUE           100
 #endif
 #endif

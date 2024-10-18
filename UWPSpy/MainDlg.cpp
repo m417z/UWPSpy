@@ -220,6 +220,131 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
     return std::nullopt;
 }
 
+// https://stackoverflow.com/a/5665377
+std::wstring EscapeXmlAttribute(std::wstring_view data) {
+    std::wstring buffer;
+    buffer.reserve(data.size());
+    for (size_t pos = 0; pos != data.size(); ++pos) {
+        switch (data[pos]) {
+            case '&':
+                buffer.append(L"&amp;");
+                break;
+            case '\"':
+                buffer.append(L"&quot;");
+                break;
+            // case '\'':
+            //     buffer.append(L"&apos;");
+            //     break;
+            case '<':
+                buffer.append(L"&lt;");
+                break;
+            case '>':
+                buffer.append(L"&gt;");
+                break;
+            default:
+                buffer.append(&data[pos], 1);
+                break;
+        }
+    }
+
+    return buffer;
+}
+
+std::wstring GetResourceDictionaryXamlFromXamlSetters(
+    const std::wstring_view type,
+    const std::wstring_view xamlStyleSetters) {
+    std::wstring xaml =
+        LR"(<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls")";
+
+    if (auto pos = type.rfind('.'); pos != type.npos) {
+        auto typeNamespace = std::wstring_view(type).substr(0, pos);
+        auto typeName = std::wstring_view(type).substr(pos + 1);
+
+        xaml += L"\n    xmlns:uwpspy=\"using:";
+        xaml += EscapeXmlAttribute(typeNamespace);
+        xaml +=
+            L"\">\n"
+            L"    <Style TargetType=\"uwpspy:";
+        xaml += EscapeXmlAttribute(typeName);
+        xaml += L"\">\n";
+    } else {
+        xaml +=
+            L">\n"
+            L"    <Style TargetType=\"";
+        xaml += EscapeXmlAttribute(type);
+        xaml += L"\">\n";
+    }
+
+    xaml += xamlStyleSetters;
+
+    xaml +=
+        L"    </Style>\n"
+        L"</ResourceDictionary>";
+
+    return xaml;
+}
+
+wux::Style GetStyleFromXamlSettersWux(
+    const std::wstring_view type,
+    const std::wstring_view xamlStyleSetters) {
+    std::wstring xaml =
+        GetResourceDictionaryXamlFromXamlSetters(type, xamlStyleSetters);
+
+    auto resourceDictionary =
+        wux::Markup::XamlReader::Load(xaml).as<wux::ResourceDictionary>();
+
+    auto [styleKey, styleInspectable] = resourceDictionary.First().Current();
+    return styleInspectable.as<wux::Style>();
+}
+
+mux::Style GetStyleFromXamlSettersMux(
+    const std::wstring_view type,
+    const std::wstring_view xamlStyleSetters) {
+    std::wstring xaml =
+        GetResourceDictionaryXamlFromXamlSetters(type, xamlStyleSetters);
+
+    auto resourceDictionary =
+        mux::Markup::XamlReader::Load(xaml).as<mux::ResourceDictionary>();
+
+    auto [styleKey, styleInspectable] = resourceDictionary.First().Current();
+    return styleInspectable.as<mux::Style>();
+}
+
+wf::IInspectable StyleValueFromXaml(wf::IInspectable element,
+                                    const std::wstring_view name,
+                                    const std::wstring_view value) {
+    std::wstring xaml;
+
+    xaml += L"        <Setter Property=\"";
+    xaml += EscapeXmlAttribute(name);
+    xaml += L"\"";
+    xaml +=
+        L">\n"
+        L"            <Setter.Value>\n";
+    xaml += value;
+    xaml +=
+        L"\n"
+        L"            </Setter.Value>\n"
+        L"        </Setter>\n";
+
+    auto className = winrt::get_class_name(element);
+
+    if (auto uiElement = element.try_as<wux::UIElement>()) {
+        auto style = GetStyleFromXamlSettersWux(className, xaml);
+        return style.Setters().GetAt(0).as<wux::Setter>().Value();
+    } else if (auto uiElement = element.try_as<mux::UIElement>()) {
+        auto style = GetStyleFromXamlSettersMux(className, xaml);
+        return style.Setters().GetAt(0).as<mux::Setter>().Value();
+    }
+
+    winrt::throw_hresult(E_NOTIMPL);
+}
+
 }  // namespace
 
 CMainDlg::CMainDlg(winrt::com_ptr<IXamlDiagnostics> diagnostics,
@@ -899,6 +1024,16 @@ LRESULT CMainDlg::OnAttributeListDblClk(LPNMHDR pnmh) {
 
             auto propertyValueEdit = CEdit(GetDlgItem(IDC_PROPERTY_VALUE));
             propertyValueEdit.SetWindowText(itemValue);
+
+            auto propertyValueXamlCheckbox =
+                CButton(GetDlgItem(IDC_PROPERTY_IS_XAML));
+            if (propertyValueXamlCheckbox.GetCheck() != BST_UNCHECKED) {
+                propertyValueXamlCheckbox.SetCheck(BST_UNCHECKED);
+                propertyValueEdit.ShowWindow(SW_SHOW);
+                auto propertyValueEditXaml =
+                    CEdit(GetDlgItem(IDC_PROPERTY_VALUE_XAML));
+                propertyValueEditXaml.ShowWindow(SW_HIDE);
+            }
         }
     }
 
@@ -913,6 +1048,16 @@ void CMainDlg::OnPropertyNameSelChange(UINT uNotifyCode,
     if (index != CB_ERR) {
         propertiesComboBox.GetLBText(index, m_lastPropertySelection);
     }
+}
+
+void CMainDlg::OnPropertyIsXaml(UINT uNotifyCode, int nID, CWindow wndCtl) {
+    bool checked = CButton(wndCtl).GetCheck() != BST_UNCHECKED;
+
+    auto propertyValueEdit = CEdit(GetDlgItem(IDC_PROPERTY_VALUE));
+    auto propertyValueEditXaml = CEdit(GetDlgItem(IDC_PROPERTY_VALUE_XAML));
+
+    propertyValueEdit.ShowWindow(checked ? SW_HIDE : SW_SHOW);
+    propertyValueEditXaml.ShowWindow(checked ? SW_SHOW : SW_HIDE);
 }
 
 void CMainDlg::OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl) {
@@ -982,14 +1127,44 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
         return;
     }
 
-    auto propertyValueEdit = CEdit(GetDlgItem(IDC_PROPERTY_VALUE));
-
-    CString propertyValue;
-    propertyValueEdit.GetWindowText(propertyValue);
-
     InstanceHandle newValueHandle;
-    HRESULT hr = m_visualTreeService->CreateInstance(
-        _bstr_t(propertyType), _bstr_t(propertyValue), &newValueHandle);
+    HRESULT hr = S_OK;
+    std::wstring errorExtraMsg;
+
+    auto propertyValueXamlCheckbox = CButton(GetDlgItem(IDC_PROPERTY_IS_XAML));
+    if (propertyValueXamlCheckbox.GetCheck() != BST_UNCHECKED) {
+        CString propertyXaml;
+        auto propertyValueEditXaml = CEdit(GetDlgItem(IDC_PROPERTY_VALUE_XAML));
+        propertyValueEditXaml.GetWindowText(propertyXaml);
+
+        try {
+            wf::IInspectable obj;
+            winrt::check_hresult(m_xamlDiagnostics->GetIInspectableFromHandle(
+                handle,
+                reinterpret_cast<::IInspectable**>(winrt::put_abi(obj))));
+
+            auto value = StyleValueFromXaml(
+                obj,
+                {propertyName.GetString(), (size_t)propertyName.GetLength()},
+                {propertyXaml.GetString(), (size_t)propertyXaml.GetLength()});
+
+            winrt::check_hresult(m_xamlDiagnostics->RegisterInstance(
+                static_cast<IInspectable*>(winrt::get_abi(value)),
+                &newValueHandle));
+        } catch (winrt::hresult_error const& ex) {
+            hr = winrt::to_hresult();
+            errorExtraMsg = ex.message();
+        } catch (...) {
+            hr = winrt::to_hresult();
+        }
+    } else {
+        CString propertyValue;
+        auto propertyValueEdit = CEdit(GetDlgItem(IDC_PROPERTY_VALUE));
+        propertyValueEdit.GetWindowText(propertyValue);
+
+        hr = m_visualTreeService->CreateInstance(
+            _bstr_t(propertyType), _bstr_t(propertyValue), &newValueHandle);
+    }
 
     if (SUCCEEDED(hr)) {
         hr = m_visualTreeService->SetProperty(handle, newValueHandle,
@@ -998,6 +1173,10 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
 
     if (FAILED(hr)) {
         auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        if (!errorExtraMsg.empty()) {
+            errorMsg += L'\n';
+            errorMsg += errorExtraMsg;
+        }
         MessageBox(errorMsg.c_str(), L"Error");
         return;
     }
@@ -1006,6 +1185,8 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
 }
 
 void CMainDlg::OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl) {
+    auto button = CButton(wndCtl);
+
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
     auto root = treeView.GetRootItem();
     if (root) {
@@ -1013,27 +1194,19 @@ void CMainDlg::OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl) {
             treeView.SetRedraw(FALSE);
         }
 
-        treeView.SelectItem(root);
-        TreeViewExpandRecursively(treeView, root, TVE_COLLAPSE);
-        treeView.EnsureVisible(root);
-
-        if (!m_redrawTreeQueued) {
-            treeView.SetRedraw(TRUE);
-        }
-    }
-}
-
-void CMainDlg::OnExpandAll(UINT uNotifyCode, int nID, CWindow wndCtl) {
-    auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
-    auto root = treeView.GetRootItem();
-    if (root) {
-        if (!m_redrawTreeQueued) {
-            treeView.SetRedraw(FALSE);
+        if (!m_listCollapsed) {
+            treeView.SelectItem(root);
+            TreeViewExpandRecursively(treeView, root, TVE_COLLAPSE);
+            treeView.EnsureVisible(root);
+            button.SetWindowText(L"Expand all");
+        } else {
+            TreeViewExpandRecursively(treeView, root, TVE_EXPAND);
+            auto selected = treeView.GetSelectedItem();
+            treeView.EnsureVisible(selected ? selected : root);
+            button.SetWindowText(L"Collapse all");
         }
 
-        TreeViewExpandRecursively(treeView, root, TVE_EXPAND);
-        auto selected = treeView.GetSelectedItem();
-        treeView.EnsureVisible(selected ? selected : root);
+        m_listCollapsed = !m_listCollapsed;
 
         if (!m_redrawTreeQueued) {
             treeView.SetRedraw(TRUE);

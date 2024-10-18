@@ -64,6 +64,7 @@ extern CAppModule _Module;
 #include <winrt/windows.ui.core.h>
 #include <winrt/windows.ui.xaml.h>
 #include <winrt/windows.ui.xaml.hosting.h>
+#include <winrt/windows.ui.xaml.markup.h>
 #include <winrt/windows.ui.xaml.media.h>
 
 // WinUI
@@ -74,4 +75,5 @@ extern CAppModule _Module;
 #include <winrt/microsoft.ui.interop.h>
 #include <winrt/microsoft.ui.xaml.h>
 #include <winrt/microsoft.ui.xaml.hosting.h>
+#include <winrt/microsoft.ui.xaml.markup.h>
 #include <winrt/microsoft.ui.xaml.media.h>
