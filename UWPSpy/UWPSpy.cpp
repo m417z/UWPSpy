@@ -84,8 +84,24 @@ HRESULT WinUIInitializeXamlDiagnostics(DWORD pid, PCWSTR dllLocation) {
         return HRESULT_FROM_WIN32(GetLastError());
     }
 
-    return ixde(L"WinUIVisualDiagConnection1", pid, L"", dllLocation,
-                CLSID_UWPSpyTAP, nullptr);
+    // In Windows 10 24H2, Explorer creates a new connection identifier for each
+    // new window, while previous connections are eventually closed. I didn't
+    // find a better way than trying many connections until one works.
+    // Reference:
+    // https://github.com/microsoft/microsoft-ui-xaml/blob/d74a0332cf0d5e58f12eddce1070fa7a79b4c2db/src/dxaml/xcp/dxaml/lib/DXamlCore.cpp#L2782
+    HRESULT hr;
+    for (int i = 0; i < 10000; i++) {
+        WCHAR connectionName[256];
+        wsprintf(connectionName, L"WinUIVisualDiagConnection%d", i + 1);
+
+        hr = ixde(connectionName, pid, L"", dllLocation, CLSID_UWPSpyTAP,
+                  nullptr);
+        if (hr != HRESULT_FROM_WIN32(ERROR_NOT_FOUND)) {
+            break;
+        }
+    }
+
+    return hr;
 }
 
 }  // namespace
