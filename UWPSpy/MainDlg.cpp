@@ -1152,7 +1152,7 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
                 static_cast<IInspectable*>(winrt::get_abi(value)),
                 &newValueHandle));
         } catch (winrt::hresult_error const& ex) {
-            hr = winrt::to_hresult();
+            hr = ex.code();
             errorExtraMsg = ex.message();
         } catch (...) {
             hr = winrt::to_hresult();
