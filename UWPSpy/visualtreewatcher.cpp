@@ -239,18 +239,22 @@ CMainDlg* VisualTreeWatcher::DlgMainForCurrentThread() {
         }
     }
 
-    std::unique_lock lock(m_dlgMainMutex);
+    CMainDlg* dlgMain;
 
-    auto [it, inserted] = m_dlgMainForEachThread.try_emplace(
-        dwCurrentThreadId, m_xamlDiagnostics,
-        std::bind(&VisualTreeWatcher::OnDlgMainEvent, this,
-                  std::placeholders::_1, std::placeholders::_2));
+    {
+        std::unique_lock lock(m_dlgMainMutex);
 
-    CMainDlg& dlgMain = it->second;
+        auto [it, inserted] = m_dlgMainForEachThread.try_emplace(
+            dwCurrentThreadId, m_xamlDiagnostics,
+            std::bind(&VisualTreeWatcher::OnDlgMainEvent, this,
+                      std::placeholders::_1, std::placeholders::_2));
 
-    if (!inserted) {
-        ATLASSERT(FALSE);
-        return &dlgMain;
+        dlgMain = &it->second;
+
+        if (!inserted) {
+            ATLASSERT(FALSE);
+            return dlgMain;
+        }
     }
 
     HWND hChildWnd = nullptr;
@@ -272,15 +276,15 @@ CMainDlg* VisualTreeWatcher::DlgMainForCurrentThread() {
         }
     }
 
-    if (!dlgMain.Create(hChildWnd)) {
+    if (!dlgMain->Create(hChildWnd)) {
         ATLTRACE(L"Main dialog creation failed!\n");
-        m_dlgMainForEachThread.erase(it);
         return nullptr;
     }
 
-    dlgMain.ShowWindow(SW_SHOWDEFAULT);
-    SetForegroundWindow(dlgMain.m_hWnd);
-    return &dlgMain;
+    dlgMain->ShowWindow(SW_SHOWDEFAULT);
+    SetForegroundWindow(dlgMain->m_hWnd);
+
+    return dlgMain;
 }
 
 void VisualTreeWatcher::OnDlgMainEvent(HWND hWnd, CMainDlg::EventId eventId) {

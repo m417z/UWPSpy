@@ -129,7 +129,7 @@ LRESULT CMainDlg::SelectProcessInListFromCursor(UINT uMsg,
                                                 WPARAM wParam,
                                                 LPARAM lParam) {
     POINT pt;
-    GetCursorPos(&pt);
+    ::GetCursorPos(&pt);
     CWindow wnd = ::WindowFromPoint(pt);
     if (!wnd) {
         return 0;
