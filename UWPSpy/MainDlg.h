@@ -173,6 +173,8 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     bool CreateFlashArea(InstanceHandle handle);
     void DestroyFlashArea();
     bool SelectElementFromCursor();
+    void OnElementTreeContextMenu(CTreeViewCtrlEx treeView, CPoint point);
+    void OnAttributesListContextMenu(CListViewCtrl listView, CPoint point);
 
     CIcon m_icon, m_smallIcon;
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;

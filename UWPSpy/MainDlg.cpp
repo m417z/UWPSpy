@@ -694,118 +694,15 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
 
 void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
-    if (wnd != treeView) {
+    if (wnd == treeView) {
+        OnElementTreeContextMenu(treeView, point);
         return;
     }
 
-    CTreeItem targetItem;
-
-    if (point.x == -1 && point.y == -1) {
-        // Keyboard context menu.
-        targetItem = treeView.GetSelectedItem();
-    } else {
-        CPoint mappedPoint = point;
-        treeView.ScreenToClient(&mappedPoint);
-
-        targetItem = treeView.HitTest(mappedPoint, nullptr);
-    }
-
-    if (!targetItem) {
+    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    if (wnd == attributesList) {
+        OnAttributesListContextMenu(attributesList, point);
         return;
-    }
-
-    CPoint menuPoint = point;
-    if (menuPoint.x == -1 && menuPoint.y == -1) {
-        // Keyboard context menu.
-        CRect rect;
-        if (targetItem.GetRect(rect, FALSE)) {
-            menuPoint = rect.CenterPoint();
-            treeView.ClientToScreen(&menuPoint);
-        } else {
-            ::GetCursorPos(&menuPoint);
-        }
-    }
-
-    CMenu menu;
-    menu.CreatePopupMenu();
-
-    enum {
-        MENU_ID_VISIBLE = 1,
-        MENU_ID_COPY_ITEM,
-        MENU_ID_COPY_SUBTREE,
-    };
-
-    auto handle = static_cast<InstanceHandle>(targetItem.GetData());
-
-    try {
-        wf::IInspectable element;
-        winrt::check_hresult(m_xamlDiagnostics->GetIInspectableFromHandle(
-            handle,
-            reinterpret_cast<::IInspectable**>(winrt::put_abi(element))));
-
-        auto wuiElement = element.try_as<wux::UIElement>();
-        auto muiElement = wuiElement ? mux::UIElement{nullptr}
-                                     : element.try_as<mux::UIElement>();
-
-        bool visible = false;
-        bool visibleCanBeToggled = true;
-        if (wuiElement) {
-            visible = wuiElement.Visibility() == wux::Visibility::Visible;
-        } else if (muiElement) {
-            visible = muiElement.Visibility() == mux::Visibility::Visible;
-        } else {
-            visibleCanBeToggled = false;
-        }
-
-        menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0) |
-                            (visibleCanBeToggled ? 0 : MF_GRAYED),
-                        MENU_ID_VISIBLE, L"Visible");
-        menu.AppendMenu(MF_SEPARATOR);
-        menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
-        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"Copy subtree");
-
-        int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD,
-                                       menuPoint.x, menuPoint.y, m_hWnd);
-        switch (nCmd) {
-            case MENU_ID_VISIBLE:
-                if (wuiElement) {
-                    wuiElement.Visibility(visible ? wux::Visibility::Collapsed
-                                                  : wux::Visibility::Visible);
-                } else if (muiElement) {
-                    muiElement.Visibility(visible ? mux::Visibility::Collapsed
-                                                  : mux::Visibility::Visible);
-                }
-
-                RefreshSelectedElementInformation();
-                break;
-
-            case MENU_ID_COPY_ITEM: {
-                CString itemText;
-                targetItem.GetText(itemText);
-                if (!CopyTextToClipboard(
-                        m_hWnd,
-                        {itemText.GetString(), (size_t)itemText.GetLength()})) {
-                    MessageBox(L"Failed to copy item text to clipboard",
-                               L"Error");
-                }
-                break;
-            }
-
-            case MENU_ID_COPY_SUBTREE: {
-                CString str;
-                TreeViewToStringRecursively(treeView, targetItem, str);
-                if (!CopyTextToClipboard(
-                        m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
-                    MessageBox(L"Failed to copy subtree text to clipboard",
-                               L"Error");
-                }
-                break;
-            }
-        }
-    } catch (...) {
-        HRESULT hr = winrt::to_hresult();
-        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
-        MessageBox(errorMsg.c_str(), L"Error");
     }
 }
 
@@ -1892,4 +1789,207 @@ bool CMainDlg::SelectElementFromCursor() {
     treeView.SelectItem(treeItem);
     treeView.EnsureVisible(treeItem);
     return true;
+}
+
+void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
+                                        CPoint point) {
+    CTreeItem targetItem;
+
+    if (point.x == -1 && point.y == -1) {
+        // Keyboard context menu.
+        targetItem = treeView.GetSelectedItem();
+    } else {
+        CPoint mappedPoint = point;
+        treeView.ScreenToClient(&mappedPoint);
+
+        targetItem = treeView.HitTest(mappedPoint, nullptr);
+    }
+
+    if (!targetItem) {
+        return;
+    }
+
+    CPoint menuPoint = point;
+    if (menuPoint.x == -1 && menuPoint.y == -1) {
+        // Keyboard context menu.
+        CRect rect;
+        if (targetItem.GetRect(rect, FALSE)) {
+            menuPoint = rect.CenterPoint();
+            treeView.ClientToScreen(&menuPoint);
+        } else {
+            ::GetCursorPos(&menuPoint);
+        }
+    }
+
+    CMenu menu;
+    menu.CreatePopupMenu();
+
+    enum {
+        MENU_ID_VISIBLE = 1,
+        MENU_ID_COPY_ITEM,
+        MENU_ID_COPY_SUBTREE,
+    };
+
+    auto handle = static_cast<InstanceHandle>(targetItem.GetData());
+
+    try {
+        wf::IInspectable element;
+        winrt::check_hresult(m_xamlDiagnostics->GetIInspectableFromHandle(
+            handle,
+            reinterpret_cast<::IInspectable**>(winrt::put_abi(element))));
+
+        auto wuiElement = element.try_as<wux::UIElement>();
+        auto muiElement = wuiElement ? mux::UIElement{nullptr}
+                                     : element.try_as<mux::UIElement>();
+
+        bool visible = false;
+        bool visibleCanBeToggled = true;
+        if (wuiElement) {
+            visible = wuiElement.Visibility() == wux::Visibility::Visible;
+        } else if (muiElement) {
+            visible = muiElement.Visibility() == mux::Visibility::Visible;
+        } else {
+            visibleCanBeToggled = false;
+        }
+
+        menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0) |
+                            (visibleCanBeToggled ? 0 : MF_GRAYED),
+                        MENU_ID_VISIBLE, L"Visible");
+        menu.AppendMenu(MF_SEPARATOR);
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"Copy subtree");
+
+        int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD,
+                                       menuPoint.x, menuPoint.y, m_hWnd);
+        switch (nCmd) {
+            case MENU_ID_VISIBLE:
+                if (wuiElement) {
+                    wuiElement.Visibility(visible ? wux::Visibility::Collapsed
+                                                  : wux::Visibility::Visible);
+                } else if (muiElement) {
+                    muiElement.Visibility(visible ? mux::Visibility::Collapsed
+                                                  : mux::Visibility::Visible);
+                }
+
+                RefreshSelectedElementInformation();
+                break;
+
+            case MENU_ID_COPY_ITEM: {
+                CString itemText;
+                targetItem.GetText(itemText);
+                if (!CopyTextToClipboard(
+                        m_hWnd,
+                        {itemText.GetString(), (size_t)itemText.GetLength()})) {
+                    MessageBox(L"Failed to copy item text to clipboard",
+                               L"Error");
+                }
+                break;
+            }
+
+            case MENU_ID_COPY_SUBTREE: {
+                CString str;
+                TreeViewToStringRecursively(treeView, targetItem, str);
+                if (!CopyTextToClipboard(
+                        m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
+                    MessageBox(L"Failed to copy subtree text to clipboard",
+                               L"Error");
+                }
+                break;
+            }
+        }
+    } catch (...) {
+        HRESULT hr = winrt::to_hresult();
+        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        MessageBox(errorMsg.c_str(), L"Error");
+    }
+}
+
+void CMainDlg::OnAttributesListContextMenu(CListViewCtrl listView,
+                                           CPoint point) {
+    int targetItem = -1;
+
+    if (point.x == -1 && point.y == -1) {
+        // Keyboard context menu.
+        targetItem = listView.GetSelectedIndex();
+    } else {
+        CPoint mappedPoint = point;
+        listView.ScreenToClient(&mappedPoint);
+
+        targetItem = listView.HitTest(mappedPoint, nullptr);
+    }
+
+    if (targetItem == -1) {
+        return;
+    }
+
+    CPoint menuPoint = point;
+    if (menuPoint.x == -1 && menuPoint.y == -1) {
+        // Keyboard context menu.
+        CRect rect;
+        if (listView.GetItemRect(targetItem, rect, LVIR_BOUNDS)) {
+            menuPoint = rect.CenterPoint();
+            listView.ClientToScreen(&menuPoint);
+        } else {
+            ::GetCursorPos(&menuPoint);
+        }
+    }
+
+    CMenu menu;
+    menu.CreatePopupMenu();
+
+    enum {
+        MENU_ID_COPY_ITEM = 1,
+        MENU_ID_COPY_ALL_ITEMS,
+    };
+
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ALL_ITEMS, L"Copy all items");
+
+    int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD, menuPoint.x,
+                                   menuPoint.y, m_hWnd);
+    switch (nCmd) {
+        case MENU_ID_COPY_ITEM: {
+            int columns = listView.GetHeader().GetItemCount();
+            CString columnText;
+            CString itemText;
+            for (int i = 0; i < columns; i++) {
+                if (i > 0) {
+                    itemText += L'\t';
+                }
+                listView.GetItemText(targetItem, i, columnText);
+                itemText += columnText;
+            }
+
+            if (!CopyTextToClipboard(m_hWnd, {itemText.GetString(),
+                                              (size_t)itemText.GetLength()})) {
+                MessageBox(L"Failed to copy item text to clipboard", L"Error");
+            }
+            break;
+        }
+
+        case MENU_ID_COPY_ALL_ITEMS: {
+            int columns = listView.GetHeader().GetItemCount();
+            CString str;
+            CString columnText;
+            CString itemText;
+            for (int i = 0; i < listView.GetItemCount(); i++) {
+                itemText.Empty();
+                for (int j = 0; j < columns; j++) {
+                    if (j > 0) {
+                        itemText += L'\t';
+                    }
+                    listView.GetItemText(i, j, columnText);
+                    itemText += columnText;
+                }
+                str += itemText + L'\n';
+            }
+
+            if (!CopyTextToClipboard(
+                    m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
+                MessageBox(L"Failed to copy all items text to clipboard",
+                           L"Error");
+            }
+            break;
+        }
+    }
 }
