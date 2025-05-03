@@ -551,7 +551,8 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
                       reinterpret_cast<POINT*>(&detailsTabsRect),
                       sizeof(RECT) / sizeof(POINT));
 
-    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    CListViewCtrl attributesList(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    m_attributesList.SubclassWindow(attributesList);
     attributesList.SetExtendedListViewStyle(
         LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
     ::SetWindowTheme(attributesList, L"Explorer", nullptr);
@@ -975,8 +976,7 @@ LRESULT CMainDlg::OnDetailsTabsSelChange(LPNMHDR pnmh) {
     auto detailsTabs = CTabCtrl(GetDlgItem(IDC_DETAILS_TABS));
     int index = detailsTabs.GetCurSel();
 
-    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
-    attributesList.ShowWindow(index == 0 ? SW_SHOW : SW_HIDE);
+    m_attributesList.ShowWindow(index == 0 ? SW_SHOW : SW_HIDE);
 
     auto visualStatesList = CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
     visualStatesList.ShowWindow(index == 1 ? SW_SHOW : SW_HIDE);
@@ -984,7 +984,7 @@ LRESULT CMainDlg::OnDetailsTabsSelChange(LPNMHDR pnmh) {
     return 0;
 }
 
-LRESULT CMainDlg::OnAttributeListDblClk(LPNMHDR pnmh) {
+LRESULT CMainDlg::OnAttributesListDblClk(LPNMHDR pnmh) {
     auto itemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pnmh);
     if (itemActivate->iItem == -1 ||
         (itemActivate->iSubItem != 0 && itemActivate->iSubItem != 1)) {
@@ -1298,8 +1298,8 @@ bool CMainDlg::SetSelectedElementInformation() {
         SetDlgItemText(IDC_NAME_EDIT, L"");
         SetDlgItemText(IDC_RECT_EDIT, L"");
 
-        auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
-        attributesList.DeleteAllItems();
+        m_attributesList.DeleteAllItems();
+        m_attributesList.SetSortColumn(-1);
 
         auto visualStatesTree =
             CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
@@ -1372,8 +1372,8 @@ bool CMainDlg::SetSelectedElementInformation() {
         PopulateAttributesList(handle);
         PopulateVisualStatesTree(handle);
     } else {
-        auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
-        attributesList.DeleteAllItems();
+        m_attributesList.DeleteAllItems();
+        m_attributesList.SetSortColumn(-1);
 
         auto visualStatesTree =
             CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
@@ -1400,7 +1400,7 @@ bool CMainDlg::RefreshSelectedElementInformation(UINT delay) {
         return true;
     }
 
-    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    CListViewCtrl attributesList(m_attributesList);
     int attributesListTopIndex = attributesList.GetTopIndex();
 
     if (!SetSelectedElementInformation()) {
@@ -1412,7 +1412,7 @@ bool CMainDlg::RefreshSelectedElementInformation(UINT delay) {
 }
 
 void CMainDlg::ResetAttributesListColumns() {
-    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    CListViewCtrl attributesList(m_attributesList);
 
     attributesList.SetRedraw(FALSE);
 
@@ -1463,10 +1463,12 @@ void CMainDlg::ResetAttributesListColumns() {
 }
 
 void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
-    auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+    CListViewCtrl attributesList(m_attributesList);
+
     attributesList.SetRedraw(FALSE);
 
     attributesList.DeleteAllItems();
+    m_attributesList.SetSortColumn(-1);
 
     auto propertiesComboBox = CComboBox(GetDlgItem(IDC_PROPERTY_NAME));
     propertiesComboBox.ResetContent();

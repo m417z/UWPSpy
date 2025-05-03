@@ -46,7 +46,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         COMMAND_ID_HANDLER_EX(IDC_SPLIT_TOGGLE, OnSplitToggle)
         NOTIFY_HANDLER_EX(IDC_DETAILS_TABS, TCN_SELCHANGE,
                           OnDetailsTabsSelChange)
-        NOTIFY_HANDLER_EX(IDC_ATTRIBUTE_LIST, NM_DBLCLK, OnAttributeListDblClk)
+        NOTIFY_HANDLER_EX(IDC_ATTRIBUTE_LIST, NM_DBLCLK, OnAttributesListDblClk)
         COMMAND_HANDLER_EX(IDC_PROPERTY_NAME, CBN_SELCHANGE,
                            OnPropertyNameSelChange)
         COMMAND_ID_HANDLER_EX(IDC_PROPERTY_IS_XAML, OnPropertyIsXaml)
@@ -140,7 +140,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     LRESULT OnElementTreeSelChanged(LPNMHDR pnmh);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnDetailsTabsSelChange(LPNMHDR pnmh);
-    LRESULT OnAttributeListDblClk(LPNMHDR pnmh);
+    LRESULT OnAttributesListDblClk(LPNMHDR pnmh);
     void OnPropertyNameSelChange(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnPropertyIsXaml(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl);
@@ -176,6 +176,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     CIcon m_icon, m_smallIcon;
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;
+    CSortListViewCtrl m_attributesList;
     bool m_listCollapsed = false;
     bool m_highlightSelection = true;
     bool m_detailedProperties = false;
