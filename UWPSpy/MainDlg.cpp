@@ -11,6 +11,44 @@ namespace {
 // Otherwise, multiple redraw operations can make the UI very slow.
 constexpr UINT kRedrawTreeDelay = 200;
 
+bool CopyTextToClipboard(HWND hWndParent, std::wstring_view text) {
+    size_t bytes = (text.size() + 1) * sizeof(WCHAR);
+    HGLOBAL hClipboardData = ::GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (!hClipboardData) {
+        return false;
+    }
+
+    void* pClipboardData = ::GlobalLock(hClipboardData);
+    if (!pClipboardData) {
+        ::GlobalFree(hClipboardData);
+        return false;
+    }
+
+    memcpy(pClipboardData, text.data(), text.size() * sizeof(WCHAR));
+    // Add null terminator.
+    ((WCHAR*)pClipboardData)[text.size()] = L'\0';
+    ::GlobalUnlock(hClipboardData);
+
+    BOOL openedClipboard = ::OpenClipboard(hWndParent);
+    if (!openedClipboard) {
+        ::GlobalFree(hClipboardData);
+        return false;
+    }
+
+    ::EmptyClipboard();
+
+    // Let the OS synthesize CF_TEXT.
+    HANDLE handle = ::SetClipboardData(CF_UNICODETEXT, hClipboardData);
+    ::CloseClipboard();
+
+    if (!handle) {
+        ::GlobalFree(hClipboardData);
+        return false;
+    }
+
+    return true;
+}
+
 // https://github.com/sumatrapdfreader/sumatrapdf/blob/9a2183db3c3db5cbf242ac9d8f8576750f581096/src/utils/WinUtil.cpp#L2863
 void TreeViewExpandRecursively(HWND hTree, HTREEITEM hItem, DWORD flag) {
     while (hItem) {
@@ -20,6 +58,36 @@ void TreeViewExpandRecursively(HWND hTree, HTREEITEM hItem, DWORD flag) {
             TreeViewExpandRecursively(hTree, child, flag);
         }
         hItem = TreeView_GetNextSibling(hTree, hItem);
+    }
+}
+
+void TreeViewToStringRecursively(CTreeViewCtrlEx tree,
+                                 CTreeItem treeItem,
+                                 CString& str,
+                                 int depth = 0) {
+    if (depth == 0) {
+        treeItem.GetText(str);
+        str += L'\n';
+        CTreeItem childItem = tree.GetChildItem(treeItem);
+        if (childItem) {
+            TreeViewToStringRecursively(tree, childItem, str, depth + 1);
+        }
+        return;
+    }
+
+    CString linePrefix(L' ', depth * 2);
+
+    while (treeItem) {
+        CString itemText;
+        treeItem.GetText(itemText);
+        str += linePrefix;
+        str += itemText;
+        str += L'\n';
+        CTreeItem childItem = tree.GetChildItem(treeItem);
+        if (childItem) {
+            TreeViewToStringRecursively(tree, childItem, str, depth + 1);
+        }
+        treeItem = tree.GetNextSiblingItem(treeItem);
     }
 }
 
@@ -663,6 +731,8 @@ void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
 
     enum {
         MENU_ID_VISIBLE = 1,
+        MENU_ID_COPY_ITEM,
+        MENU_ID_COPY_SUBTREE,
     };
 
     auto handle = static_cast<InstanceHandle>(targetItem.GetData());
@@ -677,17 +747,22 @@ void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
         auto muiElement = wuiElement ? mux::UIElement{nullptr}
                                      : element.try_as<mux::UIElement>();
 
-        bool visible;
+        bool visible = false;
+        bool visibleCanBeToggled = true;
         if (wuiElement) {
             visible = wuiElement.Visibility() == wux::Visibility::Visible;
         } else if (muiElement) {
             visible = muiElement.Visibility() == mux::Visibility::Visible;
         } else {
-            return;
+            visibleCanBeToggled = false;
         }
 
-        menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0), MENU_ID_VISIBLE,
-                        L"Visible");
+        menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0) |
+                            (visibleCanBeToggled ? 0 : MF_GRAYED),
+                        MENU_ID_VISIBLE, L"Visible");
+        menu.AppendMenu(MF_SEPARATOR);
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"Copy subtree");
 
         int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD,
                                        menuPoint.x, menuPoint.y, m_hWnd);
@@ -703,6 +778,29 @@ void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
 
                 RefreshSelectedElementInformation();
                 break;
+
+            case MENU_ID_COPY_ITEM: {
+                CString itemText;
+                targetItem.GetText(itemText);
+                if (!CopyTextToClipboard(
+                        m_hWnd,
+                        {itemText.GetString(), (size_t)itemText.GetLength()})) {
+                    MessageBox(L"Failed to copy item text to clipboard",
+                               L"Error");
+                }
+                break;
+            }
+
+            case MENU_ID_COPY_SUBTREE: {
+                CString str;
+                TreeViewToStringRecursively(treeView, targetItem, str);
+                if (!CopyTextToClipboard(
+                        m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
+                    MessageBox(L"Failed to copy subtree text to clipboard",
+                               L"Error");
+                }
+                break;
+            }
         }
     } catch (...) {
         HRESULT hr = winrt::to_hresult();
