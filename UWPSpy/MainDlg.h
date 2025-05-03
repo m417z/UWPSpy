@@ -175,6 +175,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     bool SelectElementFromCursor();
     void OnElementTreeContextMenu(CTreeViewCtrlEx treeView, CPoint point);
     void OnAttributesListContextMenu(CListViewCtrl listView, CPoint point);
+    void OnVisualStateContextMenu(CTreeViewCtrlEx treeView, CPoint point);
 
     CIcon m_icon, m_smallIcon;
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;

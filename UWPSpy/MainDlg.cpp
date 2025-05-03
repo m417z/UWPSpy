@@ -61,20 +61,10 @@ void TreeViewExpandRecursively(HWND hTree, HTREEITEM hItem, DWORD flag) {
     }
 }
 
-void TreeViewToStringRecursively(CTreeViewCtrlEx tree,
-                                 CTreeItem treeItem,
-                                 CString& str,
-                                 int depth = 0) {
-    if (depth == 0) {
-        treeItem.GetText(str);
-        str += L'\n';
-        CTreeItem childItem = tree.GetChildItem(treeItem);
-        if (childItem) {
-            TreeViewToStringRecursively(tree, childItem, str, depth + 1);
-        }
-        return;
-    }
-
+void TreeViewSubtreeToStringRecursively(CTreeViewCtrlEx tree,
+                                        CTreeItem treeItem,
+                                        CString& str,
+                                        int depth) {
     CString linePrefix(L' ', depth * 2);
 
     while (treeItem) {
@@ -85,7 +75,34 @@ void TreeViewToStringRecursively(CTreeViewCtrlEx tree,
         str += L'\n';
         CTreeItem childItem = tree.GetChildItem(treeItem);
         if (childItem) {
-            TreeViewToStringRecursively(tree, childItem, str, depth + 1);
+            TreeViewSubtreeToStringRecursively(tree, childItem, str, depth + 1);
+        }
+        treeItem = tree.GetNextSiblingItem(treeItem);
+    }
+}
+
+void TreeViewSubtreeToString(CTreeViewCtrlEx tree,
+                             CTreeItem treeItem,
+                             CString& str) {
+    treeItem.GetText(str);
+    str += L'\n';
+    CTreeItem childItem = tree.GetChildItem(treeItem);
+    if (childItem) {
+        TreeViewSubtreeToStringRecursively(tree, childItem, str, 1);
+    }
+}
+
+void TreeViewToString(CTreeViewCtrlEx tree, CString& str) {
+    str.Empty();
+    CTreeItem treeItem = tree.GetRootItem();
+    while (treeItem) {
+        CString itemText;
+        treeItem.GetText(itemText);
+        str += itemText;
+        str += L'\n';
+        CTreeItem childItem = tree.GetChildItem(treeItem);
+        if (childItem) {
+            TreeViewSubtreeToStringRecursively(tree, childItem, str, 1);
         }
         treeItem = tree.GetNextSiblingItem(treeItem);
     }
@@ -704,6 +721,12 @@ void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
         OnAttributesListContextMenu(attributesList, point);
         return;
     }
+
+    auto visualStatesTree = CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
+    if (wnd == visualStatesTree) {
+        OnVisualStateContextMenu(visualStatesTree, point);
+        return;
+    }
 }
 
 InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
@@ -973,8 +996,8 @@ LRESULT CMainDlg::OnDetailsTabsSelChange(LPNMHDR pnmh) {
 
     m_attributesList.ShowWindow(index == 0 ? SW_SHOW : SW_HIDE);
 
-    auto visualStatesList = CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
-    visualStatesList.ShowWindow(index == 1 ? SW_SHOW : SW_HIDE);
+    auto visualStatesTree = CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
+    visualStatesTree.ShowWindow(index == 1 ? SW_SHOW : SW_HIDE);
 
     return 0;
 }
@@ -1888,7 +1911,7 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
 
             case MENU_ID_COPY_SUBTREE: {
                 CString str;
-                TreeViewToStringRecursively(treeView, targetItem, str);
+                TreeViewSubtreeToString(treeView, targetItem, str);
                 if (!CopyTextToClipboard(
                         m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
                     MessageBox(L"Failed to copy subtree text to clipboard",
@@ -1987,6 +2010,73 @@ void CMainDlg::OnAttributesListContextMenu(CListViewCtrl listView,
             if (!CopyTextToClipboard(
                     m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
                 MessageBox(L"Failed to copy all items text to clipboard",
+                           L"Error");
+            }
+            break;
+        }
+    }
+}
+
+void CMainDlg::OnVisualStateContextMenu(CTreeViewCtrlEx treeView,
+                                        CPoint point) {
+    CTreeItem targetItem;
+
+    if (point.x == -1 && point.y == -1) {
+        // Keyboard context menu.
+        targetItem = treeView.GetSelectedItem();
+    } else {
+        CPoint mappedPoint = point;
+        treeView.ScreenToClient(&mappedPoint);
+
+        targetItem = treeView.HitTest(mappedPoint, nullptr);
+    }
+
+    if (!targetItem) {
+        return;
+    }
+
+    CPoint menuPoint = point;
+    if (menuPoint.x == -1 && menuPoint.y == -1) {
+        // Keyboard context menu.
+        CRect rect;
+        if (targetItem.GetRect(rect, FALSE)) {
+            menuPoint = rect.CenterPoint();
+            treeView.ClientToScreen(&menuPoint);
+        } else {
+            ::GetCursorPos(&menuPoint);
+        }
+    }
+
+    CMenu menu;
+    menu.CreatePopupMenu();
+
+    enum {
+        MENU_ID_COPY_ITEM = 1,
+        MENU_ID_COPY_ALL,
+    };
+
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ALL, L"Copy all items");
+
+    int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD, menuPoint.x,
+                                   menuPoint.y, m_hWnd);
+    switch (nCmd) {
+        case MENU_ID_COPY_ITEM: {
+            CString itemText;
+            targetItem.GetText(itemText);
+            if (!CopyTextToClipboard(m_hWnd, {itemText.GetString(),
+                                              (size_t)itemText.GetLength()})) {
+                MessageBox(L"Failed to copy item text to clipboard", L"Error");
+            }
+            break;
+        }
+
+        case MENU_ID_COPY_ALL: {
+            CString str;
+            TreeViewToString(treeView, str);
+            if (!CopyTextToClipboard(
+                    m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
+                MessageBox(L"Failed to copy subtree text to clipboard",
                            L"Error");
             }
             break;
