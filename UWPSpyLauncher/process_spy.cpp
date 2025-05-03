@@ -4,6 +4,44 @@
 
 namespace {
 
+constexpr USHORT kCurrentArch =
+#if defined(_M_IX86)
+    IMAGE_FILE_MACHINE_I386;
+#elif defined(_M_X64)
+    IMAGE_FILE_MACHINE_AMD64;
+#elif defined(_M_ARM64)
+    IMAGE_FILE_MACHINE_ARM64;
+#else
+#error "Unsupported architecture"
+#endif
+
+USHORT GetProcessArch(HANDLE hProcess) {
+    PROCESS_MACHINE_INFORMATION pmi;
+    if (GetProcessInformation(hProcess, ProcessMachineTypeInfo, &pmi,
+                              sizeof(pmi))) {
+        return pmi.ProcessMachine;
+    }
+
+    // If GetProcessInformation(ProcessMachineTypeInfo) isn't supported, assume
+    // only IMAGE_FILE_MACHINE_I386 and IMAGE_FILE_MACHINE_AMD64.
+
+#ifndef _WIN64
+    SYSTEM_INFO siSystemInfo;
+    GetNativeSystemInfo(&siSystemInfo);
+    if (siSystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) {
+        // 32-bit machine, only one option.
+        return IMAGE_FILE_MACHINE_I386;
+    }
+#endif  // _WIN64
+
+    BOOL bIsWow64Process;
+    if (IsWow64Process(hProcess, &bIsWow64Process) && bIsWow64Process) {
+        return IMAGE_FILE_MACHINE_I386;
+    }
+
+    return IMAGE_FILE_MACHINE_AMD64;
+}
+
 bool AllowAppContainerAccess(PCWSTR path) {
     PSECURITY_DESCRIPTOR sd = nullptr;
     ULONG sd_length = 0;
@@ -34,6 +72,31 @@ bool AllowAppContainerAccess(PCWSTR path) {
 }  // namespace
 
 bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
+    HANDLE hProcess =
+        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (hProcess) {
+        USHORT arch = GetProcessArch(hProcess);
+        CloseHandle(hProcess);
+        if (arch != kCurrentArch) {
+            CString message;
+            message.Format(
+                L"UWPSpy is not compatible with the target process "
+                L"architecture.\n"
+                L"\n"
+                L"Target process architecture: %X\n"
+                L"UWPSpy architecture: %X\n"
+                L"\n"
+                L"Please use the correct version of UWPSpy.\n"
+                L"\n"
+                L"Proceed anyway?",
+                arch, kCurrentArch);
+            if (MessageBox(hWnd, message, L"Warning",
+                           MB_ICONWARNING | MB_YESNO) == IDNO) {
+                return false;
+            }
+        }
+    }
+
     WCHAR path[MAX_PATH];
     switch (GetModuleFileName(nullptr, path, ARRAYSIZE(path))) {
         case 0:
