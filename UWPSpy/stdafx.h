@@ -63,6 +63,7 @@ extern CAppModule _Module;
 #include <winrt/windows.foundation.collections.h>
 #include <winrt/windows.foundation.h>
 #include <winrt/windows.ui.core.h>
+#include <winrt/windows.ui.xaml.controls.h>
 #include <winrt/windows.ui.xaml.h>
 #include <winrt/windows.ui.xaml.hosting.h>
 #include <winrt/windows.ui.xaml.markup.h>
@@ -74,6 +75,7 @@ extern CAppModule _Module;
 
 #include <winrt/microsoft.ui.content.h>
 #include <winrt/microsoft.ui.interop.h>
+#include <winrt/microsoft.ui.xaml.controls.h>
 #include <winrt/microsoft.ui.xaml.h>
 #include <winrt/microsoft.ui.xaml.hosting.h>
 #include <winrt/microsoft.ui.xaml.markup.h>

@@ -1614,10 +1614,57 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
                     std::format(L"Error {:08X}", static_cast<DWORD>(hr));
             }
 
+            std::wstring extraInfo;
+            if (auto vector =
+                    valueObj
+                        .try_as<wf::Collections::IVector<wf::IInspectable>>()) {
+                extraInfo = std::format(L" {{Size={}}}", vector.Size());
+            } else if (auto val =
+                           valueObj.try_as<wux::Media::SolidColorBrush>()) {
+                auto color = val.Color();
+                extraInfo =
+                    color.A == 0xFF
+                        ? std::format(L" {{Color=#{:02X}{:02X}{:02X}}}",
+                                      color.R, color.G, color.B)
+                        : std::format(L" {{Color=#{:02X}{:02X}{:02X}{:02X}}}",
+                                      color.A, color.R, color.G, color.B);
+            } else if (auto val =
+                           valueObj.try_as<mux::Media::SolidColorBrush>()) {
+                auto color = val.Color();
+                extraInfo =
+                    color.A == 0xFF
+                        ? std::format(L" {{Color=#{:02X}{:02X}{:02X}}}",
+                                      color.R, color.G, color.B)
+                        : std::format(L" {{Color=#{:02X}{:02X}{:02X}{:02X}}}",
+                                      color.A, color.R, color.G, color.B);
+            } else if (auto val = valueObj.try_as<wux::Controls::Grid>()) {
+                extraInfo = std::format(L" {{Columns={}, Rows={}}}",
+                                        val.ColumnDefinitions().Size(),
+                                        val.RowDefinitions().Size());
+            } else if (auto val = valueObj.try_as<mux::Controls::Grid>()) {
+                extraInfo = std::format(L" {{Columns={}, Rows={}}}",
+                                        val.ColumnDefinitions().Size(),
+                                        val.RowDefinitions().Size());
+            } else if (auto val =
+                           valueObj.try_as<
+                               wux::Controls::ColumnDefinitionCollection>()) {
+                extraInfo = std::format(L" {{Size={}}}", val.Size());
+            } else if (auto val =
+                           valueObj.try_as<
+                               mux::Controls::ColumnDefinitionCollection>()) {
+                extraInfo = std::format(L" {{Size={}}}", val.Size());
+            } else if (auto val = valueObj.try_as<
+                                  wux::Controls::RowDefinitionCollection>()) {
+                extraInfo = std::format(L" {{Size={}}}", val.Size());
+            } else if (auto val = valueObj.try_as<
+                                  mux::Controls::RowDefinitionCollection>()) {
+                extraInfo = std::format(L" {{Size={}}}", val.Size());
+            }
+
             value = std::format(
-                L"({}; {})",
+                L"({}; {}{})",
                 (v.MetadataBits & IsValueCollection) ? L"collection" : L"data",
-                className);
+                className, extraInfo);
         } else {
             value = v.Value;
             valueShownAsIs = true;
