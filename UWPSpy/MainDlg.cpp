@@ -1753,6 +1753,36 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
             wuiFrameworkElement ? mux::FrameworkElement{nullptr}
                                 : element.try_as<mux::FrameworkElement>();
 
+        // A workaround for a taskbar search box inspection crash.
+        if (wuiFrameworkElement) {
+            auto& element = wuiFrameworkElement;
+
+            // The TaskListButtonPanel child element of the search box (with
+            // "Icon and label" configuration) returns a list of size 1, but
+            // accessing the first item leads to a null dereference crash. Skip
+            // this element.
+            if (winrt::get_class_name(element) ==
+                L"Taskbar.TaskListButtonPanel") {
+                auto parent = wux::Media::VisualTreeHelper::GetParent(element)
+                                  .try_as<wux::FrameworkElement>();
+                if (parent && winrt::get_class_name(parent) ==
+                                  L"Taskbar.SearchBoxLaunchListButton") {
+                    throw std::runtime_error("Unsupported element");
+                }
+            }
+
+            // Same as above for an updated element layout (around Jun 2025).
+            if (winrt::get_class_name(element) ==
+                L"SearchUx.SearchUI.SearchButtonRootGrid") {
+                auto parent = wux::Media::VisualTreeHelper::GetParent(element)
+                                  .try_as<wux::FrameworkElement>();
+                if (parent && winrt::get_class_name(parent) ==
+                                  L"SearchUx.SearchUI.SearchPillButton") {
+                    throw std::runtime_error("Unsupported element");
+                }
+            }
+        }
+
         auto populateList = [&visualStatesTree](auto visualStateGroups) {
             for (const auto& group : visualStateGroups) {
                 auto groupName = group.Name();
