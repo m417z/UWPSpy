@@ -665,10 +665,23 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     CButton(GetDlgItem(IDC_DETAILED_PROPERTIES))
         .SetCheck(m_detailedProperties ? BST_CHECKED : BST_UNCHECKED);
 
+    CButton(GetDlgItem(IDC_STICKY))
+        .SetCheck(m_sticky ? BST_CHECKED : BST_UNCHECKED);
+
     return TRUE;
 }
 
 void CMainDlg::OnDestroy() {}
+
+BOOL CMainDlg::OnNcActivate(BOOL bActive) {
+    if (!bActive && m_sticky) {
+        // Prevent the window from being deactivated.
+        return FALSE;
+    }
+
+    SetMsgHandled(FALSE);
+    return TRUE;
+}
 
 void CMainDlg::OnFinalMessage(HWND hWnd) {
     if (m_eventCallback) {
@@ -1258,6 +1271,10 @@ void CMainDlg::OnDetailedProperties(UINT uNotifyCode, int nID, CWindow wndCtl) {
         auto handle = static_cast<InstanceHandle>(selectedItem.GetData());
         PopulateAttributesList(handle);
     }
+}
+
+void CMainDlg::OnSticky(UINT uNotifyCode, int nID, CWindow wndCtl) {
+    m_sticky = CButton(wndCtl).GetCheck() != BST_UNCHECKED;
 }
 
 void CMainDlg::OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl) {

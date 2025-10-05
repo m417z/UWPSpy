@@ -39,6 +39,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         CHAIN_MSG_MAP(CDialogResize<CMainDlg>)
         MSG_WM_INITDIALOG(OnInitDialog)
         MSG_WM_DESTROY(OnDestroy)
+        MSG_WM_NCACTIVATE(OnNcActivate)
         MSG_WM_TIMER(OnTimer)
         MSG_WM_CONTEXTMENU(OnContextMenu)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_SELCHANGED,
@@ -57,6 +58,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
                            OnHighlightSelection)
         COMMAND_HANDLER_EX(IDC_DETAILED_PROPERTIES, BN_CLICKED,
                            OnDetailedProperties)
+        COMMAND_HANDLER_EX(IDC_STICKY, BN_CLICKED, OnSticky)
         COMMAND_ID_HANDLER_EX(ID_APP_ABOUT, OnAppAbout)
         COMMAND_ID_HANDLER_EX(IDCANCEL, OnCancel)
         MESSAGE_HANDLER_EX(UWM_ACTIVATE_WINDOW, OnActivateWindow)
@@ -89,6 +91,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_COLLAPSE_ALL, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_HIGHLIGHT_SELECTION, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_DETAILED_PROPERTIES, DLSZ_MOVE_Y)
+            DLGRESIZE_CONTROL(IDC_STICKY, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(ID_APP_ABOUT, DLSZ_MOVE_X | DLSZ_MOVE_Y)
         END_DLGRESIZE_MAP()
     };
@@ -117,6 +120,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_COLLAPSE_ALL, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_HIGHLIGHT_SELECTION, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_DETAILED_PROPERTIES, DLSZ_MOVE_Y)
+            DLGRESIZE_CONTROL(IDC_STICKY, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(ID_APP_ABOUT, DLSZ_MOVE_X | DLSZ_MOVE_Y)
         END_DLGRESIZE_MAP()
     };
@@ -135,6 +139,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     BOOL OnInitDialog(CWindow wndFocus, LPARAM lInitParam);
     void OnDestroy();
+    BOOL OnNcActivate(BOOL bActive);
     void OnTimer(UINT_PTR nIDEvent);
     void OnContextMenu(CWindow wnd, CPoint point);
     LRESULT OnElementTreeSelChanged(LPNMHDR pnmh);
@@ -148,6 +153,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnHighlightSelection(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnDetailedProperties(UINT uNotifyCode, int nID, CWindow wndCtl);
+    void OnSticky(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnCancel(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnActivateWindow(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -179,6 +185,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     CIcon m_icon, m_smallIcon;
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;
+    bool m_sticky = false;
     CSortListViewCtrl m_attributesList;
     bool m_listCollapsed = false;
     bool m_highlightSelection = true;

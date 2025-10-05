@@ -27,10 +27,11 @@
 #define IDC_EXPAND_ALL                  1018
 #define IDC_HIGHLIGHT_SELECTION         1019
 #define IDC_DETAILED_PROPERTIES         1020
-#define IDC_ABOUT_TITLE                 1021
-#define IDC_ABOUT_BUTTON_RAMEN_SOFTWARE 1022
-#define IDC_ABOUT_BUTTON_HOMEPAGE       1023
-#define IDC_ABOUT_BUTTON_SOURCE_CODE    1024
+#define IDC_STICKY                      1021
+#define IDC_ABOUT_TITLE                 1022
+#define IDC_ABOUT_BUTTON_RAMEN_SOFTWARE 1023
+#define IDC_ABOUT_BUTTON_HOMEPAGE       1024
+#define IDC_ABOUT_BUTTON_SOURCE_CODE    1025
 
 // Next default values for new objects
 // 
@@ -38,7 +39,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        204
 #define _APS_NEXT_COMMAND_VALUE         32775
-#define _APS_NEXT_CONTROL_VALUE         1025
+#define _APS_NEXT_CONTROL_VALUE         1026
 #define _APS_NEXT_SYMED_VALUE           100
 #endif
 #endif
