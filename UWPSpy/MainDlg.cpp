@@ -430,6 +430,76 @@ wf::IInspectable StyleValueFromXaml(wf::IInspectable element,
     winrt::throw_hresult(E_NOTIMPL);
 }
 
+// Helper functions for 32-bit/64-bit compatibility for storing 64-bit values in
+// LPARAM/DWORD_PTR fields.
+//
+// On 64-bit builds, LPARAM and DWORD_PTR are 64 bits, so we can store 64-bit
+// values directly.
+//
+// On 32-bit builds, LPARAM and DWORD_PTR are only 32 bits, which is too small
+// to hold a 64-bit InstanceHandle or a 64-bit composite value. As a workaround,
+// we allocate the 64-bit value on the heap and store the pointer instead.
+//
+// Deliberate memory leak: The 32-bit *ToLParam/*ToDWordPtr functions allocate
+// memory that is never freed. This is a quick and dirty fix to enable 32-bit
+// builds without extensive refactoring of the data structures. For a proper
+// fix, we would need to track and free these allocations when UI elements are
+// removed.
+
+#ifdef _WIN64
+inline InstanceHandle HandleFromLParam(LPARAM lparam) {
+    return static_cast<InstanceHandle>(lparam);
+}
+
+inline LPARAM HandleToLParam(InstanceHandle handle) {
+    return static_cast<LPARAM>(handle);
+}
+
+inline bool ValueShownAsIsFromDWordPtr(DWORD_PTR ptr) {
+    return static_cast<bool>((ptr >> 32) & 1);
+}
+
+inline unsigned int PropertyIndexFromDWordPtr(DWORD_PTR ptr) {
+    return static_cast<unsigned int>(ptr & 0xFFFFFFFF);
+}
+
+inline DWORD_PTR ListItemDataToDWordPtr(bool valueShownAsIs,
+                                        unsigned int propertyIndex) {
+    return (static_cast<uint64_t>(valueShownAsIs ? 1 : 0) << 32) |
+           propertyIndex;
+}
+#else
+inline InstanceHandle HandleFromLParam(LPARAM lparam) {
+    return *reinterpret_cast<InstanceHandle*>(lparam);
+}
+
+inline LPARAM HandleToLParam(InstanceHandle handle) {
+    // Memory leak: This allocation is never freed (see comment above).
+    auto* pHandle = new InstanceHandle;
+    *pHandle = handle;
+    return reinterpret_cast<LPARAM>(pHandle);
+}
+
+inline bool ValueShownAsIsFromDWordPtr(DWORD_PTR ptr) {
+    uint64_t value = *reinterpret_cast<uint64_t*>(ptr);
+    return static_cast<bool>((value >> 32) & 1);
+}
+
+inline unsigned int PropertyIndexFromDWordPtr(DWORD_PTR ptr) {
+    uint64_t value = *reinterpret_cast<uint64_t*>(ptr);
+    return static_cast<unsigned int>(value & 0xFFFFFFFF);
+}
+
+inline DWORD_PTR ListItemDataToDWordPtr(bool valueShownAsIs,
+                                        unsigned int propertyIndex) {
+    // Memory leak: This allocation is never freed (see comment above).
+    auto* pData = new uint64_t;
+    *pData =
+        (static_cast<uint64_t>(valueShownAsIs ? 1 : 0) << 32) | propertyIndex;
+    return reinterpret_cast<DWORD_PTR>(pData);
+}
+#endif
+
 }  // namespace
 
 CMainDlg::CMainDlg(winrt::com_ptr<IXamlDiagnostics> diagnostics,
@@ -747,7 +817,7 @@ InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
 
     for (auto item = treeView.GetRootItem(); item;
          item = item.GetNextSibling()) {
-        auto handle = static_cast<InstanceHandle>(item.GetData());
+        auto handle = HandleFromLParam(item.GetData());
 
         wf::IInspectable rootElement;
         HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
@@ -1025,7 +1095,7 @@ LRESULT CMainDlg::OnAttributesListDblClk(LPNMHDR pnmh) {
     auto attributesList = CListViewCtrl(pnmh->hwndFrom);
 
     if (itemActivate->iSubItem == 0) {
-        unsigned int clickedPropertyIndex = static_cast<unsigned int>(
+        unsigned int clickedPropertyIndex = PropertyIndexFromDWordPtr(
             attributesList.GetItemData(itemActivate->iItem));
 
         auto propertiesComboBox = CComboBox(GetDlgItem(IDC_PROPERTY_NAME));
@@ -1046,8 +1116,8 @@ LRESULT CMainDlg::OnAttributesListDblClk(LPNMHDR pnmh) {
             propertiesComboBox.GetLBText(index, m_lastPropertySelection);
         }
     } else if (itemActivate->iSubItem == 1) {
-        bool valueShownAsIs =
-            (attributesList.GetItemData(itemActivate->iItem) >> 32) & 1;
+        bool valueShownAsIs = ValueShownAsIsFromDWordPtr(
+            attributesList.GetItemData(itemActivate->iItem));
         if (valueShownAsIs) {
             CString itemValue;
             attributesList.GetItemText(itemActivate->iItem,
@@ -1098,7 +1168,7 @@ void CMainDlg::OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl) {
         return;
     }
 
-    auto handle = static_cast<InstanceHandle>(selectedItem.GetData());
+    auto handle = HandleFromLParam(selectedItem.GetData());
 
     auto propertiesComboBox = CComboBox(GetDlgItem(IDC_PROPERTY_NAME));
 
@@ -1127,7 +1197,7 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
         return;
     }
 
-    auto handle = static_cast<InstanceHandle>(selectedItem.GetData());
+    auto handle = HandleFromLParam(selectedItem.GetData());
 
     auto propertiesComboBox = CComboBox(GetDlgItem(IDC_PROPERTY_NAME));
 
@@ -1254,7 +1324,7 @@ void CMainDlg::OnHighlightSelection(UINT uNotifyCode, int nID, CWindow wndCtl) {
         auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
         auto selectedItem = treeView.GetSelectedItem();
         if (selectedItem) {
-            auto handle = static_cast<InstanceHandle>(selectedItem.GetData());
+            auto handle = HandleFromLParam(selectedItem.GetData());
             CreateFlashArea(handle);
         }
     }
@@ -1268,7 +1338,7 @@ void CMainDlg::OnDetailedProperties(UINT uNotifyCode, int nID, CWindow wndCtl) {
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
     auto selectedItem = treeView.GetSelectedItem();
     if (selectedItem && selectedItem.GetParent()) {
-        auto handle = static_cast<InstanceHandle>(selectedItem.GetData());
+        auto handle = HandleFromLParam(selectedItem.GetData());
         PopulateAttributesList(handle);
     }
 }
@@ -1348,7 +1418,7 @@ bool CMainDlg::SetSelectedElementInformation() {
         return false;
     }
 
-    auto handle = static_cast<InstanceHandle>(selectedItem.GetData());
+    auto handle = HandleFromLParam(selectedItem.GetData());
     bool hasParent = !!selectedItem.GetParent();
 
     wf::IInspectable obj;
@@ -1706,13 +1776,8 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
                                    sourceToString(src.Source).c_str());
         }
 
-        // Passes on 64-bit, not on 32-bit. Can be fixed later if a 32-bit build
-        // is needed.
-        static_assert(sizeof(DWORD_PTR) >= sizeof(v.Index) + 1);
-        static_assert(sizeof(v.Index) == 4);
         attributesList.SetItemData(
-            row,
-            (static_cast<DWORD_PTR>(valueShownAsIs ? 1 : 0) << 32) | v.Index);
+            row, ListItemDataToDWordPtr(valueShownAsIs, v.Index));
 
         row++;
     }
@@ -1844,10 +1909,6 @@ void CMainDlg::AddItemToTree(HTREEITEM parentTreeItem,
 
     ATLASSERT(!elementItem->treeItem);
 
-    // Passes on 64-bit, not on 32-bit. Can be fixed later if a 32-bit build is
-    // needed.
-    static_assert(sizeof(LPARAM) >= sizeof(handle));
-
     TVINSERTSTRUCT insertStruct{
         .hParent = parentTreeItem,
         .hInsertAfter = insertAfter,
@@ -1857,7 +1918,7 @@ void CMainDlg::AddItemToTree(HTREEITEM parentTreeItem,
                 .state = TVIS_EXPANDED,
                 .stateMask = TVIS_EXPANDED,
                 .pszText = const_cast<PWSTR>(elementItem->itemTitle.c_str()),
-                .lParam = static_cast<LPARAM>(handle),
+                .lParam = HandleToLParam(handle),
             },
     };
     HTREEITEM insertedItem = treeView.InsertItem(&insertStruct);
@@ -1947,7 +2008,7 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
         MENU_ID_COPY_SUBTREE,
     };
 
-    auto handle = static_cast<InstanceHandle>(targetItem.GetData());
+    auto handle = HandleFromLParam(targetItem.GetData());
 
     try {
         wf::IInspectable element;
