@@ -25,17 +25,20 @@ jobs:
       - name: Build Release x64
         shell: pwsh
         run: |
-          $outDir = "${{ github.workspace }}\\build\\"
-          msbuild UWPSpyLauncher\\UWPSpyLauncher.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:OutDir=$outDir
-          msbuild UWPSpy\\UWPSpy.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:OutDir=$outDir
+          $outDir = Join-Path $env:GITHUB_WORKSPACE "build\\"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          msbuild UWPSpyLauncher\\UWPSpyLauncher.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:OutDir="$outDir"
+          msbuild UWPSpy\\UWPSpy.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:OutDir="$outDir"
+          Write-Host "Build output:"
+          Get-ChildItem -Path $outDir -Filter *.exe
 
       - name: Package artifacts
         shell: pwsh
         run: |
           $outDir = "artifacts"
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-          Copy-Item "build\\UWPSpyLauncher.exe" -Destination $outDir
-          Copy-Item "build\\UWPSpy.exe" -Destination $outDir
+          Copy-Item "$env:GITHUB_WORKSPACE\\build\\UWPSpyLauncher.exe" -Destination $outDir
+          Copy-Item "$env:GITHUB_WORKSPACE\\build\\UWPSpy.exe" -Destination $outDir
           Compress-Archive -Path "$outDir\\*" -DestinationPath "UWPSpy-Release-x64.zip" -Force
 
       - name: Upload build artifact
