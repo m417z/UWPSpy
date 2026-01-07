@@ -23,24 +23,19 @@ jobs:
         run: nuget restore UWPSpy.sln
 
       - name: Build Release x64
-        run: msbuild UWPSpy.sln /m /p:Configuration=Release /p:Platform=x64
+        shell: pwsh
+        run: |
+          $outDir = "${{ github.workspace }}\\build\\"
+          msbuild UWPSpyLauncher\\UWPSpyLauncher.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:OutDir=$outDir
+          msbuild UWPSpy\\UWPSpy.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:OutDir=$outDir
 
       - name: Package artifacts
         shell: pwsh
         run: |
           $outDir = "artifacts"
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-          $launcherExe = Get-ChildItem -Path . -Recurse -Filter UWPSpyLauncher.exe |
-            Where-Object { $_.FullName -match "\\\\Release\\\\" } |
-            Select-Object -First 1
-          $uwpspyExe = Get-ChildItem -Path . -Recurse -Filter UWPSpy.exe |
-            Where-Object { $_.FullName -match "\\\\Release\\\\" } |
-            Select-Object -First 1
-          if (-not $launcherExe -or -not $uwpspyExe) {
-            throw "Release executables not found."
-          }
-          Copy-Item $launcherExe.FullName -Destination $outDir
-          Copy-Item $uwpspyExe.FullName -Destination $outDir
+          Copy-Item "build\\UWPSpyLauncher.exe" -Destination $outDir
+          Copy-Item "build\\UWPSpy.exe" -Destination $outDir
           Compress-Archive -Path "$outDir\\*" -DestinationPath "UWPSpy-Release-x64.zip" -Force
 
       - name: Upload build artifact
