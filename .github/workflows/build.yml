@@ -16,6 +16,9 @@ jobs:
       - name: Setup NuGet
         uses: nuget/setup-nuget@v2
 
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
       - name: Restore NuGet packages
         run: nuget restore UWPSpy.sln
 
