@@ -688,7 +688,7 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     DlgResize_Init();
 
     // Init UI elements.
-    SetWindowText(std::format(L"UWPSpy - PID: {} TID: {}",
+    SetWindowText(std::format(L"UWPSpy - PID: {} 线程: {}",
                               GetCurrentProcessId(), GetCurrentThreadId())
                       .c_str());
 
@@ -698,8 +698,8 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     ::SetWindowTheme(treeView, L"Explorer", nullptr);
 
     auto detailsTabs = CTabCtrl(GetDlgItem(IDC_DETAILS_TABS));
-    detailsTabs.InsertItem(0, L"Attributes");
-    detailsTabs.InsertItem(1, L"Visual states");
+    detailsTabs.InsertItem(0, L"属性");
+    detailsTabs.InsertItem(1, L"视觉状态");
     CRect detailsTabsRect;
     detailsTabs.GetWindowRect(&detailsTabsRect);
     ::MapWindowPoints(nullptr, m_hWnd,
@@ -1182,8 +1182,8 @@ void CMainDlg::OnPropertyRemove(UINT uNotifyCode, int nID, CWindow wndCtl) {
 
     HRESULT hr = m_visualTreeService->ClearProperty(handle, propertyIndex);
     if (FAILED(hr)) {
-        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
-        MessageBox(errorMsg.c_str(), L"Error");
+        auto errorMsg = std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
+        MessageBox(errorMsg.c_str(), L"错误");
         return;
     }
 
@@ -1224,7 +1224,7 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
     }
 
     if (propertyName.IsEmpty() || propertyType.IsEmpty()) {
-        MessageBox(L"Something went wrong", L"Error");
+        MessageBox(L"发生错误", L"错误");
         return;
     }
 
@@ -1273,12 +1273,12 @@ void CMainDlg::OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl) {
     }
 
     if (FAILED(hr)) {
-        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        auto errorMsg = std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
         if (!errorExtraMsg.empty()) {
             errorMsg += L'\n';
             errorMsg += errorExtraMsg;
         }
-        MessageBox(errorMsg.c_str(), L"Error");
+        MessageBox(errorMsg.c_str(), L"错误");
         return;
     }
 
@@ -1299,13 +1299,14 @@ void CMainDlg::OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl) {
             treeView.SelectItem(root);
             TreeViewExpandRecursively(treeView, root, TVE_COLLAPSE);
             treeView.EnsureVisible(root);
-            button.SetWindowText(L"Expand all");
+            button.SetWindowText(L"全部展开");
         } else {
             TreeViewExpandRecursively(treeView, root, TVE_EXPAND);
             auto selected = treeView.GetSelectedItem();
             treeView.EnsureVisible(selected ? selected : root);
-            button.SetWindowText(L"Collapse all");
+            button.SetWindowText(L"全部折叠");
         }
+
 
         m_listCollapsed = !m_listCollapsed;
 
@@ -1431,7 +1432,7 @@ bool CMainDlg::SetSelectedElementInformation() {
         obj = nullptr;
 
         HRESULT hr = winrt::to_hresult();
-        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        auto errorMsg = std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
         SetDlgItemText(IDC_CLASS_EDIT, errorMsg.c_str());
     }
 
@@ -1446,7 +1447,7 @@ bool CMainDlg::SetSelectedElementInformation() {
     } catch (...) {
         HRESULT hr = winrt::to_hresult();
         frameworkElementName =
-            std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+            std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
     }
 
     SetDlgItemText(IDC_NAME_EDIT, frameworkElementName.c_str());
@@ -1461,12 +1462,12 @@ bool CMainDlg::SetSelectedElementInformation() {
                     rect->right, rect->bottom, rect->Width(), rect->Height());
                 SetDlgItemText(IDC_RECT_EDIT, rectStr.c_str());
             } else {
-                SetDlgItemText(IDC_RECT_EDIT, L"Unknown");
+                SetDlgItemText(IDC_RECT_EDIT, L"未知");
             }
         } catch (...) {
             HRESULT hr = winrt::to_hresult();
             auto errorMsg =
-                std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+                std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
             SetDlgItemText(IDC_RECT_EDIT, errorMsg.c_str());
         }
     } else {
@@ -1544,25 +1545,26 @@ void CMainDlg::ResetAttributesListColumns() {
     int c = 0;
 
     if (m_detailedProperties) {
-        attributesList.InsertColumn(c++, L"Name", LVCFMT_LEFT, width / 2);
-        attributesList.InsertColumn(c++, L"Value", LVCFMT_LEFT, width / 3);
-        attributesList.InsertColumn(c++, L"Type", LVCFMT_LEFT, width / 3);
-        attributesList.InsertColumn(c++, L"DeclaringType", LVCFMT_LEFT,
+        attributesList.InsertColumn(c++, L"名称", LVCFMT_LEFT, width / 2);
+        attributesList.InsertColumn(c++, L"值", LVCFMT_LEFT, width / 3);
+        attributesList.InsertColumn(c++, L"类型", LVCFMT_LEFT, width / 3);
+        attributesList.InsertColumn(c++, L"声明类型", LVCFMT_LEFT,
                                     width / 3);
-        attributesList.InsertColumn(c++, L"ValueType", LVCFMT_LEFT, width / 3);
-        attributesList.InsertColumn(c++, L"ItemType", LVCFMT_LEFT, width / 3);
-        attributesList.InsertColumn(c++, L"Overridden", LVCFMT_LEFT, width / 3);
-        attributesList.InsertColumn(c++, L"MetadataBits", LVCFMT_LEFT,
+        attributesList.InsertColumn(c++, L"值类型", LVCFMT_LEFT, width / 3);
+        attributesList.InsertColumn(c++, L"项类型", LVCFMT_LEFT, width / 3);
+        attributesList.InsertColumn(c++, L"已覆盖", LVCFMT_LEFT, width / 3);
+        attributesList.InsertColumn(c++, L"元数据位", LVCFMT_LEFT,
                                     width / 3);
-        attributesList.InsertColumn(c++, L"Style TargetType", LVCFMT_LEFT,
+        attributesList.InsertColumn(c++, L"样式目标类型", LVCFMT_LEFT,
                                     width / 3);
-        attributesList.InsertColumn(c++, L"Style Name", LVCFMT_LEFT, width / 3);
-        attributesList.InsertColumn(c++, L"Style Source", LVCFMT_LEFT,
+        attributesList.InsertColumn(c++, L"样式名称", LVCFMT_LEFT, width / 3);
+        attributesList.InsertColumn(c++, L"样式来源", LVCFMT_LEFT,
                                     width / 3);
     } else {
-        attributesList.InsertColumn(c++, L"Name", LVCFMT_LEFT, width / 2);
-        attributesList.InsertColumn(c++, L"Value", LVCFMT_LEFT, width / 2);
+        attributesList.InsertColumn(c++, L"名称", LVCFMT_LEFT, width / 2);
+        attributesList.InsertColumn(c++, L"值", LVCFMT_LEFT, width / 2);
     }
+
 
     attributesList.SetRedraw(TRUE);
 }
@@ -1586,12 +1588,13 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
         handle, &sourceCount, &pPropertySources, &propertyCount,
         &pPropertyValues);
     if (FAILED(hr)) {
-        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        auto errorMsg = std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
         attributesList.AddItem(0, 0, errorMsg.c_str());
 
         attributesList.SetRedraw(TRUE);
         return;
     }
+
 
     const auto metadataBitsToString = [](hyper metadataBits) {
         std::wstring str;
@@ -1683,7 +1686,7 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
             value = v.Value;
             valueShownAsIs = true;
         } else if (v.MetadataBits & IsValueNull) {
-            value = L"(null)";
+            value = L"（空）";
         } else if (v.MetadataBits & IsValueHandle) {
             InstanceHandle valueHandle =
                 static_cast<InstanceHandle>(std::wcstoll(v.Value, nullptr, 10));
@@ -1698,59 +1701,57 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
                 className = winrt::get_class_name(valueObj);
             } else {
                 className =
-                    std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+                    std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
             }
 
             std::wstring extraInfo;
             if (auto vector =
                     valueObj
                         .try_as<wf::Collections::IVector<wf::IInspectable>>()) {
-                extraInfo = std::format(L" {{Size={}}}", vector.Size());
+                extraInfo = std::format(L" {{数量={}}}", vector.Size());
             } else if (auto val =
                            valueObj.try_as<wux::Media::SolidColorBrush>()) {
                 auto color = val.Color();
                 extraInfo =
                     color.A == 0xFF
-                        ? std::format(L" {{Color=#{:02X}{:02X}{:02X}}}",
+                        ? std::format(L" {{颜色=#{:02X}{:02X}{:02X}}}",
                                       color.R, color.G, color.B)
-                        : std::format(L" {{Color=#{:02X}{:02X}{:02X}{:02X}}}",
+                        : std::format(L" {{颜色=#{:02X}{:02X}{:02X}{:02X}}}",
                                       color.A, color.R, color.G, color.B);
             } else if (auto val =
                            valueObj.try_as<mux::Media::SolidColorBrush>()) {
                 auto color = val.Color();
                 extraInfo =
                     color.A == 0xFF
-                        ? std::format(L" {{Color=#{:02X}{:02X}{:02X}}}",
+                        ? std::format(L" {{颜色=#{:02X}{:02X}{:02X}}}",
                                       color.R, color.G, color.B)
-                        : std::format(L" {{Color=#{:02X}{:02X}{:02X}{:02X}}}",
+                        : std::format(L" {{颜色=#{:02X}{:02X}{:02X}{:02X}}}",
                                       color.A, color.R, color.G, color.B);
             } else if (auto val = valueObj.try_as<wux::Controls::Grid>()) {
-                extraInfo = std::format(L" {{Columns={}, Rows={}}}",
+                extraInfo = std::format(L" {{列={}, 行={}}}",
                                         val.ColumnDefinitions().Size(),
                                         val.RowDefinitions().Size());
             } else if (auto val = valueObj.try_as<mux::Controls::Grid>()) {
-                extraInfo = std::format(L" {{Columns={}, Rows={}}}",
+                extraInfo = std::format(L" {{列={}, 行={}}}",
                                         val.ColumnDefinitions().Size(),
                                         val.RowDefinitions().Size());
-            } else if (auto val =
-                           valueObj.try_as<
-                               wux::Controls::ColumnDefinitionCollection>()) {
-                extraInfo = std::format(L" {{Size={}}}", val.Size());
-            } else if (auto val =
-                           valueObj.try_as<
-                               mux::Controls::ColumnDefinitionCollection>()) {
-                extraInfo = std::format(L" {{Size={}}}", val.Size());
             } else if (auto val = valueObj.try_as<
-                                  wux::Controls::RowDefinitionCollection>()) {
-                extraInfo = std::format(L" {{Size={}}}", val.Size());
+                                   wux::Controls::ColumnDefinitionCollection>()) {
+                extraInfo = std::format(L" {{数量={}}}", val.Size());
             } else if (auto val = valueObj.try_as<
-                                  mux::Controls::RowDefinitionCollection>()) {
-                extraInfo = std::format(L" {{Size={}}}", val.Size());
+                                   mux::Controls::ColumnDefinitionCollection>()) {
+                extraInfo = std::format(L" {{数量={}}}", val.Size());
+            } else if (auto val = valueObj.try_as<
+                                   wux::Controls::RowDefinitionCollection>()) {
+                extraInfo = std::format(L" {{数量={}}}", val.Size());
+            } else if (auto val = valueObj.try_as<
+                                   mux::Controls::RowDefinitionCollection>()) {
+                extraInfo = std::format(L" {{数量={}}}", val.Size());
             }
 
             value = std::format(
                 L"({}; {}{})",
-                (v.MetadataBits & IsValueCollection) ? L"collection" : L"data",
+                (v.MetadataBits & IsValueCollection) ? L"集合" : L"数据",
                 className, extraInfo);
         } else {
             value = v.Value;
@@ -1767,7 +1768,7 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
             attributesList.AddItem(row, c++, v.DeclaringType);
             attributesList.AddItem(row, c++, v.ValueType);
             attributesList.AddItem(row, c++, v.ItemType);
-            attributesList.AddItem(row, c++, v.Overridden ? L"Yes" : L"No");
+            attributesList.AddItem(row, c++, v.Overridden ? L"是" : L"否");
             attributesList.AddItem(
                 row, c++, metadataBitsToString(v.MetadataBits).c_str());
             attributesList.AddItem(row, c++, src.TargetType);
@@ -1810,7 +1811,7 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
             handle,
             reinterpret_cast<::IInspectable**>(winrt::put_abi(element))));
         if (!element) {
-            throw std::runtime_error("Element can't be retrieved");
+            throw std::runtime_error("无法获取元素");
         }
 
         auto wuiFrameworkElement = element.try_as<wux::FrameworkElement>();
@@ -1830,9 +1831,9 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
                 L"Taskbar.TaskListButtonPanel") {
                 auto parent = wux::Media::VisualTreeHelper::GetParent(element)
                                   .try_as<wux::FrameworkElement>();
-                if (parent && winrt::get_class_name(parent) ==
+                 if (parent && winrt::get_class_name(parent) ==
                                   L"Taskbar.SearchBoxLaunchListButton") {
-                    throw std::runtime_error("Unsupported element");
+                    throw std::runtime_error("不支持的元素");
                 }
             }
 
@@ -1841,9 +1842,9 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
                 L"SearchUx.SearchUI.SearchButtonRootGrid") {
                 auto parent = wux::Media::VisualTreeHelper::GetParent(element)
                                   .try_as<wux::FrameworkElement>();
-                if (parent && winrt::get_class_name(parent) ==
+                 if (parent && winrt::get_class_name(parent) ==
                                   L"SearchUx.SearchUI.SearchPillButton") {
-                    throw std::runtime_error("Unsupported element");
+                    throw std::runtime_error("不支持的元素");
                 }
             }
         }
@@ -1852,8 +1853,9 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
             for (const auto& group : visualStateGroups) {
                 auto groupName = group.Name();
                 if (groupName.empty()) {
-                    groupName = L"(unnamed)";
+                    groupName = L"（未命名）";
                 }
+
 
                 auto currentState = group.CurrentState();
 
@@ -1863,12 +1865,13 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
                 for (auto state : group.States()) {
                     std::wstring name(state.Name());
                     if (name.empty()) {
-                        name = L"(unnamed)";
+                        name = L"（未命名）";
                     }
 
                     if (state == currentState) {
-                        name += L" (current)";
+                        name += L"（当前）";
                     }
+
 
                     visualStatesTree.InsertItem(name.c_str(), groupItem,
                                                 TVI_LAST);
@@ -1891,12 +1894,13 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
         }
     } catch (...) {
         HRESULT hr = winrt::to_hresult();
-        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        auto errorMsg = std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
         visualStatesTree.InsertItem(errorMsg.c_str(), TVI_ROOT, TVI_LAST);
 
         visualStatesTree.SetRedraw(TRUE);
         return;
     }
+
 
     visualStatesTree.SetRedraw(TRUE);
 }
@@ -2032,10 +2036,10 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
 
         menu.AppendMenu(MF_STRING | (visible ? MF_CHECKED : 0) |
                             (visibleCanBeToggled ? 0 : MF_GRAYED),
-                        MENU_ID_VISIBLE, L"Visible");
+                        MENU_ID_VISIBLE, L"可见");
         menu.AppendMenu(MF_SEPARATOR);
-        menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
-        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"Copy subtree");
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"复制项");
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"复制子树");
 
         int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD,
                                        menuPoint.x, menuPoint.y, m_hWnd);
@@ -2058,8 +2062,8 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
                 if (!CopyTextToClipboard(
                         m_hWnd,
                         {itemText.GetString(), (size_t)itemText.GetLength()})) {
-                    MessageBox(L"Failed to copy item text to clipboard",
-                               L"Error");
+                    MessageBox(L"无法将项文本复制到剪贴板",
+                               L"错误");
                 }
                 break;
             }
@@ -2069,16 +2073,16 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
                 TreeViewSubtreeToString(treeView, targetItem, str);
                 if (!CopyTextToClipboard(
                         m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
-                    MessageBox(L"Failed to copy subtree text to clipboard",
-                               L"Error");
+                    MessageBox(L"无法将子树文本复制到剪贴板",
+                               L"错误");
                 }
                 break;
             }
         }
     } catch (...) {
         HRESULT hr = winrt::to_hresult();
-        auto errorMsg = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
-        MessageBox(errorMsg.c_str(), L"Error");
+        auto errorMsg = std::format(L"错误 {:08X}", static_cast<DWORD>(hr));
+        MessageBox(errorMsg.c_str(), L"错误");
     }
 }
 
@@ -2120,8 +2124,8 @@ void CMainDlg::OnAttributesListContextMenu(CListViewCtrl listView,
         MENU_ID_COPY_ALL_ITEMS,
     };
 
-    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
-    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ALL_ITEMS, L"Copy all items");
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"复制项");
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ALL_ITEMS, L"复制所有项");
 
     int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD, menuPoint.x,
                                    menuPoint.y, m_hWnd);
@@ -2140,7 +2144,7 @@ void CMainDlg::OnAttributesListContextMenu(CListViewCtrl listView,
 
             if (!CopyTextToClipboard(m_hWnd, {itemText.GetString(),
                                               (size_t)itemText.GetLength()})) {
-                MessageBox(L"Failed to copy item text to clipboard", L"Error");
+                MessageBox(L"无法将项文本复制到剪贴板", L"错误");
             }
             break;
         }
@@ -2164,8 +2168,8 @@ void CMainDlg::OnAttributesListContextMenu(CListViewCtrl listView,
 
             if (!CopyTextToClipboard(
                     m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
-                MessageBox(L"Failed to copy all items text to clipboard",
-                           L"Error");
+                MessageBox(L"无法将所有项文本复制到剪贴板",
+                           L"错误");
             }
             break;
         }
@@ -2210,8 +2214,8 @@ void CMainDlg::OnVisualStateContextMenu(CTreeViewCtrlEx treeView,
         MENU_ID_COPY_ALL,
     };
 
-    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
-    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ALL, L"Copy all items");
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"复制项");
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ALL, L"复制所有项");
 
     int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD, menuPoint.x,
                                    menuPoint.y, m_hWnd);
@@ -2221,7 +2225,7 @@ void CMainDlg::OnVisualStateContextMenu(CTreeViewCtrlEx treeView,
             targetItem.GetText(itemText);
             if (!CopyTextToClipboard(m_hWnd, {itemText.GetString(),
                                               (size_t)itemText.GetLength()})) {
-                MessageBox(L"Failed to copy item text to clipboard", L"Error");
+                MessageBox(L"无法将项文本复制到剪贴板", L"错误");
             }
             break;
         }
@@ -2231,8 +2235,8 @@ void CMainDlg::OnVisualStateContextMenu(CTreeViewCtrlEx treeView,
             TreeViewToString(treeView, str);
             if (!CopyTextToClipboard(
                     m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
-                MessageBox(L"Failed to copy subtree text to clipboard",
-                           L"Error");
+                MessageBox(L"无法将子树文本复制到剪贴板",
+                           L"错误");
             }
             break;
         }

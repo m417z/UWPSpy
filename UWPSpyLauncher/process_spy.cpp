@@ -80,17 +80,16 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
         if (arch != kCurrentArch) {
             CString message;
             message.Format(
-                L"UWPSpy is not compatible with the target process "
-                L"architecture.\n"
+                L"UWPSpy 与目标进程架构不兼容。\n"
                 L"\n"
-                L"Target process architecture: %X\n"
-                L"UWPSpy architecture: %X\n"
+                L"目标进程架构：%X\n"
+                L"UWPSpy 架构：%X\n"
                 L"\n"
-                L"Please use the correct version of UWPSpy.\n"
+                L"请使用正确版本的 UWPSpy。\n"
                 L"\n"
-                L"Proceed anyway?",
+                L"仍要继续吗？",
                 arch, kCurrentArch);
-            if (MessageBox(hWnd, message, L"Warning",
+            if (MessageBox(hWnd, message, L"警告",
                            MB_ICONWARNING | MB_YESNO) == IDNO) {
                 return false;
             }
@@ -101,8 +100,7 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
     switch (GetModuleFileName(nullptr, path, ARRAYSIZE(path))) {
         case 0:
         case ARRAYSIZE(path):
-            MessageBox(hWnd, L"Failed to get module path", L"Error",
-                       MB_ICONERROR);
+            MessageBox(hWnd, L"无法获取模块路径", L"错误", MB_ICONERROR);
             return false;
     }
 
@@ -111,22 +109,19 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
     wcscpy_s(filename, ARRAYSIZE(path) - (filename - path), L"UWPSpy.dll");
 
     if (GetFileAttributes(path) == INVALID_FILE_ATTRIBUTES) {
-        MessageBox(hWnd, L"UWPSpy.dll is missing", L"Error", MB_ICONERROR);
+        MessageBox(hWnd, L"缺少 UWPSpy.dll", L"错误", MB_ICONERROR);
         return false;
     }
 
     if (!AllowAppContainerAccess(path)) {
         PCWSTR warningMsg =
-            L"Failed to adjust the file permissions for UWPSpy.dll. A UWP "
-            L"application running in a sandboxed AppContainer environment "
-            L"might not be able to load the module.\n"
+            L"无法调整 UWPSpy.dll 的文件权限。运行在沙盒 AppContainer 环境中的 UWP "
+            L"应用可能无法加载该模块。\n"
             L"\n"
-            L"If UWPSpy is running from a USB flash drive or a network drive, "
-            L"consider copying it to the main system drive and running it from "
-            L"there.\n"
+            L"如果 UWPSpy 在 U 盘或网络驱动器上运行，建议将其复制到主系统盘后再运行。\n"
             L"\n"
-            L"Proceed anyway?";
-        if (MessageBox(hWnd, warningMsg, L"Warning",
+            L"仍要继续吗？";
+        if (MessageBox(hWnd, warningMsg, L"警告",
                        MB_ICONWARNING | MB_YESNO) == IDNO) {
             return false;
         }
@@ -134,7 +129,7 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
 
     HMODULE lib = LoadLibrary(path);
     if (!lib) {
-        MessageBox(hWnd, L"Failed to load UWPSpy.dll", L"Error", MB_ICONERROR);
+        MessageBox(hWnd, L"无法加载 UWPSpy.dll", L"错误", MB_ICONERROR);
         return false;
     }
 
@@ -144,12 +139,11 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
         (isDebugging_proc_t)GetProcAddress(lib, "isDebugging");
     if (isDebugging && isDebugging(pid)) {
         PCWSTR warningMsg =
-            L"UWPSpy is already inspecting the target process. To start a new "
-            L"inspection session, close all existing UWPSpy windows and try "
-            L"again.\n"
+            L"UWPSpy 已在检查该目标进程。若要开始新的检查会话，请关闭所有已打开的 "
+            L"UWPSpy 窗口后重试。\n"
             L"\n"
-            L"Resume the existing inspection session?";
-        if (MessageBox(hWnd, warningMsg, L"Warning",
+            L"是否继续现有的检查会话？";
+        if (MessageBox(hWnd, warningMsg, L"警告",
                        MB_ICONWARNING | MB_YESNO) == IDNO) {
             return false;
         }
@@ -159,7 +153,7 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
 
     start_proc_t start = (start_proc_t)GetProcAddress(lib, "start");
     if (!start) {
-        MessageBox(hWnd, L"Failed to find spy function", L"Error",
+        MessageBox(hWnd, L"未找到监视函数", L"错误",
                    MB_ICONERROR);
         return false;
     }
@@ -167,14 +161,13 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
     HRESULT hr = start(pid, framework);
     if (FAILED(hr)) {
         CString message =
-            L"Failed to start spying:\n" + AtlGetErrorDescription(hr);
+            L"启动监视失败：\n" + AtlGetErrorDescription(hr);
 
         switch (framework) {
             case kFrameworkUWP:
                 if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND)) {
                     message +=
-                        L"\n\nMake sure that the target process is a UWP "
-                        L"application.";
+                        L"\n\n请确认目标进程是 UWP 应用。";
                 }
                 break;
 
@@ -182,13 +175,12 @@ bool ProcessSpy(HWND hWnd, DWORD pid, ProcessSpyFramework framework) {
                 if (hr == HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND) ||
                     hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND)) {
                     message +=
-                        L"\n\nMake sure that the target process is a WinUI 3 "
-                        L"application.";
+                        L"\n\n请确认目标进程是 WinUI 3 应用。";
                 }
                 break;
         }
 
-        MessageBox(hWnd, message, L"Error", MB_ICONERROR);
+        MessageBox(hWnd, message, L"错误", MB_ICONERROR);
         return false;
     }
 
