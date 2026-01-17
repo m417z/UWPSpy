@@ -11,8 +11,7 @@ void OpenUrl(HWND hWnd, PCWSTR url) {
                               SW_SHOWNORMAL) <= 32) {
         CString errorMsg;
         errorMsg.Format(
-            L"Failed to open link, you can copy it with Ctrl+C and open it in "
-            L"a browser manually:\n\n%s",
+            L"无法打开链接，你可以用 Ctrl+C 复制并在浏览器中手动打开：\n\n%s",
             url);
         MessageBox(hWnd, errorMsg, nullptr, MB_ICONHAND);
     }

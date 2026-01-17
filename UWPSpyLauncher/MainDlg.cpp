@@ -13,8 +13,7 @@ void OpenUrl(HWND hWnd, PCWSTR url) {
                               SW_SHOWNORMAL) <= 32) {
         CString errorMsg;
         errorMsg.Format(
-            L"Failed to open link, you can copy it with Ctrl+C and open it in "
-            L"a browser manually:\n\n%s",
+            L"无法打开链接，你可以用 Ctrl+C 复制并在浏览器中手动打开：\n\n%s",
             url);
         MessageBox(hWnd, errorMsg, nullptr, MB_ICONHAND);
     }
@@ -64,8 +63,8 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
 void CMainDlg::OnOK(UINT uNotifyCode, int nID, CWindow wndCtl) {
     int selectedIndex = m_processListSort.GetSelectedIndex();
     if (selectedIndex == -1) {
-        MessageBox(L"Select a process from the list to spy on",
-                   L"No process selected", MB_ICONWARNING);
+        MessageBox(L"请从列表中选择要监视的进程",
+                   L"未选择进程", MB_ICONWARNING);
         return;
     }
 
@@ -78,20 +77,19 @@ void CMainDlg::OnRefresh(UINT uNotifyCode, int nID, CWindow wndCtl) {
 
 void CMainDlg::OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl) {
     PCWSTR content =
-        L"An inspection tool for UWP and WinUI 3 applications. Seamlessly view "
-        L"and manipulate UI elements and their properties in real time.\n"
+        L"用于 UWP 和 WinUI 3 应用的检查工具。可实时查看并操作 UI 元素及其属性。\n"
         L"\n"
-        L"By <A HREF=\"https://ramensoftware.com/\">Ramen Software</A>\n"
+        L"作者 <A HREF=\"https://ramensoftware.com/\">Ramen Software</A>\n"
         L"\n"
-        L"<A HREF=\"https://ramensoftware.com/uwpspy\">Homepage</a>\n"
-        L"<A HREF=\"https://github.com/m417z/UWPSpy\">Source code</a>";
+        L"<A HREF=\"https://ramensoftware.com/uwpspy\">主页</a>\n"
+        L"<A HREF=\"https://github.com/m417z/UWPSpy\">源代码</a>";
 
     TASKDIALOGCONFIG taskDialogConfig{
         .cbSize = sizeof(taskDialogConfig),
         .hwndParent = m_hWnd,
         .hInstance = _Module.GetModuleInstance(),
         .dwFlags = TDF_ENABLE_HYPERLINKS | TDF_ALLOW_DIALOG_CANCELLATION,
-        .pszWindowTitle = L"About",
+        .pszWindowTitle = L"关于",
         .pszMainIcon = MAKEINTRESOURCE(IDR_MAINFRAME),
         .pszMainInstruction = L"UWPSpy v" VER_FILE_VERSION_WSTR,
         .pszContent = content,
@@ -182,7 +180,7 @@ void CMainDlg::InitProcessList() {
         int width;
         WORD sort;
     } columns[] = {
-        {L"Process name", -60, LVCOLSORT_TEXT},
+        {L"进程名", -60, LVCOLSORT_TEXT},
         {L"PID", 60, LVCOLSORT_DECIMAL},
     };
 

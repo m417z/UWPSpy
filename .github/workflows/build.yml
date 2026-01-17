@@ -1,0 +1,55 @@
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore UWPSpy.sln
+
+      - name: Build Release x64
+        shell: pwsh
+        run: |
+          $outDir = Join-Path $env:GITHUB_WORKSPACE "build\\"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          msbuild UWPSpyLauncher\\UWPSpyLauncher.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:OutDir="$outDir"
+          msbuild UWPSpy\\UWPSpy.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:OutDir="$outDir"
+          Write-Host "Build output:"
+          Get-ChildItem -Path $outDir -Filter *.exe
+          Get-ChildItem -Path $outDir -Filter *.dll
+
+      - name: Package artifacts
+        shell: pwsh
+        run: |
+          $outDir = "artifacts"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          Copy-Item "$env:GITHUB_WORKSPACE\\build\\UWPSpyLauncher.exe" -Destination $outDir
+          Copy-Item "$env:GITHUB_WORKSPACE\\build\\UWPSpy.dll" -Destination $outDir
+          Compress-Archive -Path "$outDir\\*" -DestinationPath "UWPSpy-Release-x64.zip" -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UWPSpy-Release-x64
+          path: UWPSpy-Release-x64.zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: UWPSpy-Release-x64.zip

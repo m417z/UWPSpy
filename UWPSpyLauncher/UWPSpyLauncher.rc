@@ -17,7 +17,7 @@
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
-#pragma code_page(1252)
+#pragma code_page(65001)
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -66,13 +66,13 @@ CAPTION "UWPSpy"
 FONT 9, "Segoe UI", 0, 0, 0x0
 BEGIN
     CONTROL         "",IDC_PROCESS_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,7,242,98
-    LTEXT           "Target framework:",IDC_STATIC_FRAMEWORK,7,110,61,8
+    LTEXT           "目标框架：",IDC_STATIC_FRAMEWORK,7,110,61,8
     CONTROL         "UWP",IDC_RADIO_UWP,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,71,109,31,10
     CONTROL         "WinUI 3",IDC_RADIO_WINUI,"Button",BS_AUTORADIOBUTTON,105,109,39,10
-    DEFPUSHBUTTON   "Spy",IDOK,7,123,50,14
-    PUSHBUTTON      "&Refresh",IDC_REFRESH_BUTTON,61,123,50,14
-    PUSHBUTTON      "&About",ID_APP_ABOUT,145,123,50,14
-    PUSHBUTTON      "Exit",IDCANCEL,199,123,50,14
+    DEFPUSHBUTTON   "监视(&S)",IDOK,7,123,50,14
+    PUSHBUTTON      "刷新(&R)",IDC_REFRESH_BUTTON,61,123,50,14
+    PUSHBUTTON      "关于(&A)",ID_APP_ABOUT,145,123,50,14
+    PUSHBUTTON      "退出(&E)",IDCANCEL,199,123,50,14
 END
 
 
@@ -142,80 +142,80 @@ END
 
 STRINGTABLE
 BEGIN
-    ID_FILE_NEW             "Create a new document\nNew"
-    ID_FILE_OPEN            "Open an existing document\nOpen"
-    ID_FILE_CLOSE           "Close the active document\nClose"
-    ID_FILE_SAVE            "Save the active document\nSave"
-    ID_FILE_SAVE_AS         "Save the active document with a new name\nSave As"
-    ID_FILE_PAGE_SETUP      "Change the printing options\nPage Setup"
-    ID_FILE_PRINT_SETUP     "Change the printer and printing options\nPrint Setup"
-    ID_FILE_PRINT           "Print the active document\nPrint"
-    ID_FILE_PRINT_PREVIEW   "Display full pages\nPrint Preview"
+    ID_FILE_NEW             "创建新文档\n新建"
+    ID_FILE_OPEN            "打开已有文档\n打开"
+    ID_FILE_CLOSE           "关闭活动文档\n关闭"
+    ID_FILE_SAVE            "保存活动文档\n保存"
+    ID_FILE_SAVE_AS         "用新名称保存活动文档\n另存为"
+    ID_FILE_PAGE_SETUP      "更改打印选项\n页面设置"
+    ID_FILE_PRINT_SETUP     "更改打印机和打印选项\n打印设置"
+    ID_FILE_PRINT           "打印活动文档\n打印"
+    ID_FILE_PRINT_PREVIEW   "显示完整页面\n打印预览"
 END
 
 STRINGTABLE
 BEGIN
-    ID_APP_ABOUT            "Display program information, version number and copyright\nAbout"
-    ID_APP_EXIT             "Quit the application; prompts to save documents\nExit"
+    ID_APP_ABOUT            "显示程序信息、版本号和版权\n关于"
+    ID_APP_EXIT             "退出应用程序；提示保存文档\n退出"
 END
 
 STRINGTABLE
 BEGIN
-    ID_NEXT_PANE            "Switch to the next window pane\nNext Pane"
-    ID_PREV_PANE            "Switch back to the previous window pane\nPrevious Pane"
+    ID_NEXT_PANE            "切换到下一个窗口窗格\n下一个窗格"
+    ID_PREV_PANE            "切换到上一个窗口窗格\n上一个窗格"
 END
 
 STRINGTABLE
 BEGIN
-    ID_WINDOW_NEW           "Open another window for the active document\nNew Window"
-    ID_WINDOW_ARRANGE       "Arrange icons at the bottom of the window\nArrange Icons"
-    ID_WINDOW_CASCADE       "Arrange windows so they overlap\nCascade Windows"
-    ID_WINDOW_TILE_HORZ     "Arrange windows as non-overlapping tiles\nTile Windows"
-    ID_WINDOW_TILE_VERT     "Arrange windows as non-overlapping tiles\nTile Windows"
-    ID_WINDOW_SPLIT         "Split the active window into panes\nSplit"
+    ID_WINDOW_NEW           "为活动文档打开另一个窗口\n新建窗口"
+    ID_WINDOW_ARRANGE       "在窗口底部排列图标\n排列图标"
+    ID_WINDOW_CASCADE       "将窗口层叠排列\n层叠窗口"
+    ID_WINDOW_TILE_HORZ     "将窗口以不重叠方式平铺\n水平平铺"
+    ID_WINDOW_TILE_VERT     "将窗口以不重叠方式平铺\n垂直平铺"
+    ID_WINDOW_SPLIT         "将活动窗口拆分为窗格\n拆分"
 END
 
 STRINGTABLE
 BEGIN
-    ID_EDIT_CLEAR           "Erase the selection\nErase"
-    ID_EDIT_CLEAR_ALL       "Erase everything\nErase All"
-    ID_EDIT_COPY            "Copy the selection and put it on the Clipboard\nCopy"
-    ID_EDIT_CUT             "Cut the selection and put it on the Clipboard\nCut"
-    ID_EDIT_FIND            "Find the specified text\nFind"
-    ID_EDIT_PASTE           "Insert Clipboard contents\nPaste"
-    ID_EDIT_REPEAT          "Repeat the last action\nRepeat"
-    ID_EDIT_REPLACE         "Replace specific text with different text\nReplace"
-    ID_EDIT_SELECT_ALL      "Select the entire document\nSelect All"
-    ID_EDIT_UNDO            "Undo the last action\nUndo"
-    ID_EDIT_REDO            "Redo the previously undone action\nRedo"
+    ID_EDIT_CLEAR           "清除所选内容\n清除"
+    ID_EDIT_CLEAR_ALL       "清除全部内容\n全部清除"
+    ID_EDIT_COPY            "复制所选内容到剪贴板\n复制"
+    ID_EDIT_CUT             "剪切所选内容到剪贴板\n剪切"
+    ID_EDIT_FIND            "查找指定文本\n查找"
+    ID_EDIT_PASTE           "插入剪贴板内容\n粘贴"
+    ID_EDIT_REPEAT          "重复上一次操作\n重复"
+    ID_EDIT_REPLACE         "用其他文本替换指定文本\n替换"
+    ID_EDIT_SELECT_ALL      "选择整个文档\n全选"
+    ID_EDIT_UNDO            "撤销上一次操作\n撤销"
+    ID_EDIT_REDO            "重做之前撤销的操作\n重做"
 END
 
 STRINGTABLE
 BEGIN
-    ATL_IDS_SCSIZE          "Change the window size"
-    ATL_IDS_SCMOVE          "Change the window position"
-    ATL_IDS_SCMINIMIZE      "Reduce the window to an icon"
-    ATL_IDS_SCMAXIMIZE      "Enlarge the window to full size"
-    ATL_IDS_SCNEXTWINDOW    "Switch to the next document window"
-    ATL_IDS_SCPREVWINDOW    "Switch to the previous document window"
-    ATL_IDS_SCCLOSE         "Close the active window and prompts to save the documents"
+    ATL_IDS_SCSIZE          "更改窗口大小"
+    ATL_IDS_SCMOVE          "更改窗口位置"
+    ATL_IDS_SCMINIMIZE      "最小化窗口"
+    ATL_IDS_SCMAXIMIZE      "最大化窗口"
+    ATL_IDS_SCNEXTWINDOW    "切换到下一个文档窗口"
+    ATL_IDS_SCPREVWINDOW    "切换到上一个文档窗口"
+    ATL_IDS_SCCLOSE         "关闭活动窗口并提示保存文档"
 END
 
 STRINGTABLE
 BEGIN
-    ATL_IDS_SCRESTORE       "Restore the window to normal size"
-    ATL_IDS_SCTASKLIST      "Activate Task List"
-    ATL_IDS_MDICHILD        "Activate this window"
+    ATL_IDS_SCRESTORE       "还原窗口到正常大小"
+    ATL_IDS_SCTASKLIST      "激活任务列表"
+    ATL_IDS_MDICHILD        "激活此窗口"
 END
 
 STRINGTABLE
 BEGIN
-    ATL_IDS_IDLEMESSAGE     "Ready"
+    ATL_IDS_IDLEMESSAGE     "就绪"
 END
 
 STRINGTABLE
 BEGIN
-    ATL_IDS_MRU_FILE        "Open this document"
+    ATL_IDS_MRU_FILE        "打开此文档"
 END
 
 #endif    // English (United States) resources
