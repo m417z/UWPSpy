@@ -305,6 +305,100 @@ std::optional<CRect> GetRootElementRect(wf::IInspectable element,
     return std::nullopt;
 }
 
+template <typename GridLengthType>
+std::wstring FormatGridLength(const GridLengthType& gridLength) {
+    // GridLength is a struct with: double Value, GridUnitType GridUnitType
+    // GridUnitType enum: Auto=0, Pixel=1, Star=2
+
+    if (gridLength.GridUnitType == decltype(gridLength.GridUnitType)::Auto) {
+        return L"Auto";
+    } else if (gridLength.GridUnitType ==
+               decltype(gridLength.GridUnitType)::Star) {
+        if (gridLength.Value == 1.0) {
+            return L"*";
+        } else {
+            return std::format(L"{}*", gridLength.Value);
+        }
+    } else {  // Pixel (Absolute)
+        return std::format(L"{}px", gridLength.Value);
+    }
+}
+
+template <typename CollectionType>
+std::wstring FormatColumnDefinitionCollection(
+    const CollectionType& collection) {
+    uint32_t size = collection.Size();
+    if (size == 0) {
+        return L" {Size=0}";
+    }
+
+    std::wstring result = L" [";
+
+    for (uint32_t i = 0; i < size; i++) {
+        if (i > 0) {
+            result += L", ";
+        }
+
+        auto definition = collection.GetAt(i);
+        result += L"{Width=";
+        result += FormatGridLength(definition.Width());
+
+        // Only include MinWidth if != 0
+        double minWidth = definition.MinWidth();
+        if (minWidth != 0.0) {
+            result += std::format(L", MinWidth={}", minWidth);
+        }
+
+        // Only include MaxWidth if != Infinity
+        double maxWidth = definition.MaxWidth();
+        if (!std::isinf(maxWidth)) {
+            result += std::format(L", MaxWidth={}", maxWidth);
+        }
+
+        result += L"}";
+    }
+
+    result += L"]";
+    return result;
+}
+
+template <typename CollectionType>
+std::wstring FormatRowDefinitionCollection(const CollectionType& collection) {
+    uint32_t size = collection.Size();
+    if (size == 0) {
+        return L" {Size=0}";
+    }
+
+    std::wstring result = L" [";
+
+    for (uint32_t i = 0; i < size; i++) {
+        if (i > 0) {
+            result += L", ";
+        }
+
+        auto definition = collection.GetAt(i);
+        result += L"{Height=";
+        result += FormatGridLength(definition.Height());
+
+        // Only include MinHeight if != 0
+        double minHeight = definition.MinHeight();
+        if (minHeight != 0.0) {
+            result += std::format(L", MinHeight={}", minHeight);
+        }
+
+        // Only include MaxHeight if != Infinity
+        double maxHeight = definition.MaxHeight();
+        if (!std::isinf(maxHeight)) {
+            result += std::format(L", MaxHeight={}", maxHeight);
+        }
+
+        result += L"}";
+    }
+
+    result += L"]";
+    return result;
+}
+
 // https://stackoverflow.com/a/5665377
 std::wstring EscapeXmlAttribute(std::wstring_view data) {
     std::wstring buffer;
@@ -1735,17 +1829,17 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
             } else if (auto val =
                            valueObj.try_as<
                                wux::Controls::ColumnDefinitionCollection>()) {
-                extraInfo = std::format(L" {{Size={}}}", val.Size());
+                extraInfo = FormatColumnDefinitionCollection(val);
             } else if (auto val =
                            valueObj.try_as<
                                mux::Controls::ColumnDefinitionCollection>()) {
-                extraInfo = std::format(L" {{Size={}}}", val.Size());
+                extraInfo = FormatColumnDefinitionCollection(val);
             } else if (auto val = valueObj.try_as<
                                   wux::Controls::RowDefinitionCollection>()) {
-                extraInfo = std::format(L" {{Size={}}}", val.Size());
+                extraInfo = FormatRowDefinitionCollection(val);
             } else if (auto val = valueObj.try_as<
                                   mux::Controls::RowDefinitionCollection>()) {
-                extraInfo = std::format(L" {{Size={}}}", val.Size());
+                extraInfo = FormatRowDefinitionCollection(val);
             }
 
             value = std::format(
