@@ -108,6 +108,63 @@ void TreeViewToString(CTreeViewCtrlEx tree, CString& str) {
     }
 }
 
+std::wstring BuildElementPath(
+    const std::unordered_map<InstanceHandle, CMainDlg::ElementItem>&
+        elementItems,
+    InstanceHandle handle) {
+    // Build path components from child to root
+    std::vector<std::wstring> pathComponents;
+
+    InstanceHandle currentHandle = handle;
+    while (currentHandle) {
+        auto it = elementItems.find(currentHandle);
+        if (it == elementItems.end()) {
+            break;
+        }
+
+        const auto& elementItem = it->second;
+
+        // Stop before adding root element (root has parentHandle == 0)
+        if (!elementItem.parentHandle) {
+            break;
+        }
+
+        // Parse itemTitle to extract ClassName and Name
+        // Format is "ClassName - Name" or just "ClassName"
+        const std::wstring& itemTitle = elementItem.itemTitle;
+        std::wstring component;
+
+        size_t separatorPos = itemTitle.find(L" - ");
+        if (separatorPos != std::wstring::npos) {
+            // Has name, format as "ClassName#Name"
+            std::wstring className = itemTitle.substr(0, separatorPos);
+            // Skip " - "
+            std::wstring name = itemTitle.substr(separatorPos + 3);
+            component = className + L"#" + name;
+        } else {
+            // No name, just use ClassName
+            component = itemTitle;
+        }
+
+        pathComponents.push_back(component);
+        currentHandle = elementItem.parentHandle;
+    }
+
+    // Reverse to get root-to-child order
+    std::reverse(pathComponents.begin(), pathComponents.end());
+
+    // Join with " > " separator
+    std::wstring path;
+    for (size_t i = 0; i < pathComponents.size(); ++i) {
+        if (i > 0) {
+            path += L" > ";
+        }
+        path += pathComponents[i];
+    }
+
+    return path;
+}
+
 bool IsTreeItemInView(CTreeItem treeItem) {
     CRect rect;
     if (!treeItem.GetRect(rect, FALSE)) {
@@ -2097,9 +2154,12 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
         MENU_ID_VISIBLE = 1,
         MENU_ID_COPY_ITEM,
         MENU_ID_COPY_SUBTREE,
+        MENU_ID_COPY_PATH,
     };
 
     auto handle = HandleFromLParam(targetItem.GetData());
+
+    bool isRoot = !targetItem.GetParent();
 
     try {
         wf::IInspectable element;
@@ -2127,6 +2187,8 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
         menu.AppendMenu(MF_SEPARATOR);
         menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
         menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"Copy subtree");
+        menu.AppendMenu(MF_STRING | (isRoot ? MF_GRAYED : 0), MENU_ID_COPY_PATH,
+                        L"Copy path");
 
         int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD,
                                        menuPoint.x, menuPoint.y, m_hWnd);
@@ -2162,6 +2224,14 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
                         m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
                     MessageBox(L"Failed to copy subtree text to clipboard",
                                L"Error");
+                }
+                break;
+            }
+
+            case MENU_ID_COPY_PATH: {
+                std::wstring path = BuildElementPath(m_elementItems, handle);
+                if (!CopyTextToClipboard(m_hWnd, path)) {
+                    MessageBox(L"Failed to copy path to clipboard", L"Error");
                 }
                 break;
             }
