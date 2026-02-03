@@ -850,7 +850,8 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
 
     auto detailsTabs = CTabCtrl(GetDlgItem(IDC_DETAILS_TABS));
     detailsTabs.InsertItem(0, L"Attributes");
-    detailsTabs.InsertItem(1, L"Visual states");
+    detailsTabs.InsertItem(1, L"Detailed attributes");
+    detailsTabs.InsertItem(2, L"Visual states");
     CRect detailsTabsRect;
     detailsTabs.GetWindowRect(&detailsTabsRect);
     ::MapWindowPoints(nullptr, m_hWnd,
@@ -882,9 +883,6 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
 
     CButton(GetDlgItem(IDC_HIGHLIGHT_SELECTION))
         .SetCheck(m_highlightSelection ? BST_CHECKED : BST_UNCHECKED);
-
-    CButton(GetDlgItem(IDC_DETAILED_PROPERTIES))
-        .SetCheck(m_detailedProperties ? BST_CHECKED : BST_UNCHECKED);
 
     CButton(GetDlgItem(IDC_STICKY))
         .SetCheck(m_sticky ? BST_CHECKED : BST_UNCHECKED);
@@ -1228,10 +1226,34 @@ LRESULT CMainDlg::OnDetailsTabsSelChange(LPNMHDR pnmh) {
     auto detailsTabs = CTabCtrl(GetDlgItem(IDC_DETAILS_TABS));
     int index = detailsTabs.GetCurSel();
 
-    m_attributesList.ShowWindow(index == 0 ? SW_SHOW : SW_HIDE);
+    bool needsReconfigure = false;
+    if (index == 0 || index == 1) {
+        // Determine if we're in detailed mode based on tab selection.
+        bool newDetailedProperties = (index == 1);
+
+        // Check if we need to reconfigure columns.
+        needsReconfigure = (m_detailedProperties != newDetailedProperties);
+
+        m_detailedProperties = newDetailedProperties;
+    }
+
+    // Show/hide appropriate controls
+    m_attributesList.ShowWindow((index == 0 || index == 1) ? SW_SHOW : SW_HIDE);
 
     auto visualStatesTree = CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
-    visualStatesTree.ShowWindow(index == 1 ? SW_SHOW : SW_HIDE);
+    visualStatesTree.ShowWindow(index == 2 ? SW_SHOW : SW_HIDE);
+
+    // If switching between attribute tabs, reconfigure and refresh.
+    if (needsReconfigure) {
+        ResetAttributesListColumns();
+
+        auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+        auto selectedItem = treeView.GetSelectedItem();
+        if (selectedItem && selectedItem.GetParent()) {
+            auto handle = HandleFromLParam(selectedItem.GetData());
+            PopulateAttributesList(handle);
+        }
+    }
 
     return 0;
 }
@@ -1478,19 +1500,6 @@ void CMainDlg::OnHighlightSelection(UINT uNotifyCode, int nID, CWindow wndCtl) {
             auto handle = HandleFromLParam(selectedItem.GetData());
             CreateFlashArea(handle);
         }
-    }
-}
-
-void CMainDlg::OnDetailedProperties(UINT uNotifyCode, int nID, CWindow wndCtl) {
-    m_detailedProperties = CButton(wndCtl).GetCheck() != BST_UNCHECKED;
-
-    ResetAttributesListColumns();
-
-    auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
-    auto selectedItem = treeView.GetSelectedItem();
-    if (selectedItem && selectedItem.GetParent()) {
-        auto handle = HandleFromLParam(selectedItem.GetData());
-        PopulateAttributesList(handle);
     }
 }
 

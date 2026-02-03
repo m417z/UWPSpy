@@ -26,12 +26,11 @@
 #define IDC_COLLAPSE_ALL                1017
 #define IDC_EXPAND_ALL                  1018
 #define IDC_HIGHLIGHT_SELECTION         1019
-#define IDC_DETAILED_PROPERTIES         1020
-#define IDC_STICKY                      1021
-#define IDC_ABOUT_TITLE                 1022
-#define IDC_ABOUT_BUTTON_RAMEN_SOFTWARE 1023
-#define IDC_ABOUT_BUTTON_HOMEPAGE       1024
-#define IDC_ABOUT_BUTTON_SOURCE_CODE    1025
+#define IDC_STICKY                      1020
+#define IDC_ABOUT_TITLE                 1021
+#define IDC_ABOUT_BUTTON_RAMEN_SOFTWARE 1022
+#define IDC_ABOUT_BUTTON_HOMEPAGE       1023
+#define IDC_ABOUT_BUTTON_SOURCE_CODE    1024
 
 // Next default values for new objects
 // 

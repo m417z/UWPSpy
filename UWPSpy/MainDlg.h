@@ -56,8 +56,6 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         COMMAND_ID_HANDLER_EX(IDC_COLLAPSE_ALL, OnCollapseAll)
         COMMAND_HANDLER_EX(IDC_HIGHLIGHT_SELECTION, BN_CLICKED,
                            OnHighlightSelection)
-        COMMAND_HANDLER_EX(IDC_DETAILED_PROPERTIES, BN_CLICKED,
-                           OnDetailedProperties)
         COMMAND_HANDLER_EX(IDC_STICKY, BN_CLICKED, OnSticky)
         COMMAND_ID_HANDLER_EX(ID_APP_ABOUT, OnAppAbout)
         COMMAND_ID_HANDLER_EX(IDCANCEL, OnCancel)
@@ -90,7 +88,6 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_PROPERTY_SET, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_COLLAPSE_ALL, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_HIGHLIGHT_SELECTION, DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_DETAILED_PROPERTIES, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_STICKY, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(ID_APP_ABOUT, DLSZ_MOVE_X | DLSZ_MOVE_Y)
         END_DLGRESIZE_MAP()
@@ -119,7 +116,6 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_PROPERTY_SET, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_COLLAPSE_ALL, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_HIGHLIGHT_SELECTION, DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_DETAILED_PROPERTIES, DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(IDC_STICKY, DLSZ_MOVE_X | DLSZ_MOVE_Y)
             DLGRESIZE_CONTROL(ID_APP_ABOUT, DLSZ_MOVE_X | DLSZ_MOVE_Y)
         END_DLGRESIZE_MAP()
@@ -152,7 +148,6 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnPropertySet(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnCollapseAll(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnHighlightSelection(UINT uNotifyCode, int nID, CWindow wndCtl);
-    void OnDetailedProperties(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnSticky(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnCancel(UINT uNotifyCode, int nID, CWindow wndCtl);
