@@ -177,6 +177,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnElementTreeContextMenu(CTreeViewCtrlEx treeView, CPoint point);
     void OnAttributesListContextMenu(CListViewCtrl listView, CPoint point);
     void OnVisualStateContextMenu(CTreeViewCtrlEx treeView, CPoint point);
+    void DumpElementRecursive(std::wstring& output,
+                              InstanceHandle handle,
+                              bool isFirst);
 
     CIcon m_icon, m_smallIcon;
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;

@@ -456,6 +456,87 @@ std::wstring FormatRowDefinitionCollection(const CollectionType& collection) {
     return result;
 }
 
+struct FormattedPropertyValue {
+    std::wstring value;
+    bool valueShownAsIs;
+};
+
+FormattedPropertyValue FormatPropertyValue(const PropertyChainValue& v,
+                                           IXamlDiagnostics* xamlDiagnostics) {
+    if (v.MetadataBits & IsValueNull) {
+        return {L"(null)", false};
+    }
+
+    if (v.MetadataBits & IsValueHandle) {
+        InstanceHandle valueHandle =
+            static_cast<InstanceHandle>(std::wcstoll(v.Value, nullptr, 10));
+
+        std::wstring className;
+
+        wf::IInspectable valueObj;
+        HRESULT hr = xamlDiagnostics->GetIInspectableFromHandle(
+            valueHandle,
+            reinterpret_cast<::IInspectable**>(winrt::put_abi(valueObj)));
+        if (SUCCEEDED(hr)) {
+            className = winrt::get_class_name(valueObj);
+        } else {
+            className = std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+        }
+
+        std::wstring extraInfo;
+        if (auto vector =
+                valueObj.try_as<wf::Collections::IVector<wf::IInspectable>>()) {
+            extraInfo = std::format(L" {{Size={}}}", vector.Size());
+        } else if (auto val = valueObj.try_as<wux::Media::SolidColorBrush>()) {
+            auto color = val.Color();
+            extraInfo =
+                color.A == 0xFF
+                    ? std::format(L" {{Color=#{:02X}{:02X}{:02X}}}", color.R,
+                                  color.G, color.B)
+                    : std::format(L" {{Color=#{:02X}{:02X}{:02X}{:02X}}}",
+                                  color.A, color.R, color.G, color.B);
+        } else if (auto val = valueObj.try_as<mux::Media::SolidColorBrush>()) {
+            auto color = val.Color();
+            extraInfo =
+                color.A == 0xFF
+                    ? std::format(L" {{Color=#{:02X}{:02X}{:02X}}}", color.R,
+                                  color.G, color.B)
+                    : std::format(L" {{Color=#{:02X}{:02X}{:02X}{:02X}}}",
+                                  color.A, color.R, color.G, color.B);
+        } else if (auto val = valueObj.try_as<wux::Controls::Grid>()) {
+            extraInfo = std::format(L" {{Columns={}, Rows={}}}",
+                                    val.ColumnDefinitions().Size(),
+                                    val.RowDefinitions().Size());
+        } else if (auto val = valueObj.try_as<mux::Controls::Grid>()) {
+            extraInfo = std::format(L" {{Columns={}, Rows={}}}",
+                                    val.ColumnDefinitions().Size(),
+                                    val.RowDefinitions().Size());
+        } else if (auto val = valueObj.try_as<
+                              wux::Controls::ColumnDefinitionCollection>()) {
+            extraInfo = FormatColumnDefinitionCollection(val);
+        } else if (auto val = valueObj.try_as<
+                              mux::Controls::ColumnDefinitionCollection>()) {
+            extraInfo = FormatColumnDefinitionCollection(val);
+        } else if (auto val =
+                       valueObj
+                           .try_as<wux::Controls::RowDefinitionCollection>()) {
+            extraInfo = FormatRowDefinitionCollection(val);
+        } else if (auto val =
+                       valueObj
+                           .try_as<mux::Controls::RowDefinitionCollection>()) {
+            extraInfo = FormatRowDefinitionCollection(val);
+        }
+
+        return {std::format(L"({}; {}{})",
+                            (v.MetadataBits & IsValueCollection) ? L"collection"
+                                                                 : L"data",
+                            className, extraInfo),
+                false};
+    }
+
+    return {v.Value, true};
+}
+
 // https://stackoverflow.com/a/5665377
 std::wstring EscapeXmlAttribute(std::wstring_view data) {
     std::wstring buffer;
@@ -652,6 +733,142 @@ inline DWORD_PTR ListItemDataToDWordPtr(bool valueShownAsIs,
 #endif
 
 }  // namespace
+
+void CMainDlg::DumpElementRecursive(std::wstring& output,
+                                    InstanceHandle handle,
+                                    bool isFirst) {
+    // Skip separator for first element
+    if (!isFirst) {
+        output += L"\n";
+    }
+
+    // Build and write path
+    std::wstring path = BuildElementPath(m_elementItems, handle);
+    output += L"Path: ";
+    output += path.empty() ? L"(root)" : path;
+    output += L"\n";
+
+    // Get IInspectable object
+    wf::IInspectable obj;
+    HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
+        handle, reinterpret_cast<::IInspectable**>(winrt::put_abi(obj)));
+
+    if (SUCCEEDED(hr)) {
+        // Write class name
+        auto className = winrt::get_class_name(obj);
+        output += L"Class: ";
+        output += className;
+        output += L"\n";
+
+        // Write element name
+        std::wstring elementName;
+        if (auto frameworkElement = obj.try_as<wux::FrameworkElement>()) {
+            elementName = frameworkElement.Name();
+        } else if (auto frameworkElement =
+                       obj.try_as<mux::FrameworkElement>()) {
+            elementName = frameworkElement.Name();
+        }
+        output += L"Name: ";
+        output += elementName.empty() ? L"(none)" : elementName;
+        output += L"\n";
+
+        // Write rectangle
+        auto it = m_elementItems.find(handle);
+        bool isRoot =
+            (it != m_elementItems.end() && it->second.parentHandle == 0);
+
+        std::optional<CRect> rect;
+        if (isRoot) {
+            rect = GetRootElementRect(obj);
+        } else {
+            rect = GetRelativeElementRect(obj);
+        }
+
+        if (rect) {
+            output += std::format(L"Rectangle: ({},{}) - ({},{})  -  {}x{}\n",
+                                  rect->left, rect->top, rect->right,
+                                  rect->bottom, rect->Width(), rect->Height());
+        } else {
+            output += L"Rectangle: (unavailable)\n";
+        }
+    }
+
+    // Write properties
+    unsigned int sourceCount = 0;
+    PropertyChainSource* pPropertySources = nullptr;
+    unsigned int propertyCount = 0;
+    PropertyChainValue* pPropertyValues = nullptr;
+
+    hr = m_visualTreeService->GetPropertyValuesChain(
+        handle, &sourceCount, &pPropertySources, &propertyCount,
+        &pPropertyValues);
+
+    if (SUCCEEDED(hr)) {
+        // First, output local properties
+        bool hasLocalProperties = false;
+        for (unsigned int i = 0; i < propertyCount; i++) {
+            const auto& prop = pPropertyValues[i];
+            const auto& src = pPropertySources[prop.PropertyChainIndex];
+
+            if (src.Source == BaseValueSourceLocal) {
+                if (!hasLocalProperties) {
+                    output += L"Local properties:\n";
+                    hasLocalProperties = true;
+                }
+
+                auto [value, valueShownAsIs] =
+                    FormatPropertyValue(prop, m_xamlDiagnostics.get());
+                output += L"- ";
+                output += prop.PropertyName;
+                output += L": ";
+                output += value;
+                output += L"\n";
+            }
+        }
+
+        // Then, output other properties
+        bool hasOtherProperties = false;
+        for (unsigned int i = 0; i < propertyCount; i++) {
+            const auto& prop = pPropertyValues[i];
+            const auto& src = pPropertySources[prop.PropertyChainIndex];
+
+            if (src.Source != BaseValueSourceLocal) {
+                if (!hasOtherProperties) {
+                    output += L"Other Properties:\n";
+                    hasOtherProperties = true;
+                }
+
+                auto [value, valueShownAsIs] =
+                    FormatPropertyValue(prop, m_xamlDiagnostics.get());
+                output += L"- ";
+                output += prop.PropertyName;
+                output += L": ";
+                output += value;
+                output += L"\n";
+            }
+        }
+
+        if (!hasLocalProperties && !hasOtherProperties) {
+            output += L"Properties:\n";
+            output += L"(no properties available)\n";
+        }
+
+        // Free memory
+        CoTaskMemFree(pPropertySources);
+        CoTaskMemFree(pPropertyValues);
+    } else {
+        output += L"Properties:\n";
+        output += L"(no properties available)\n";
+    }
+
+    // Recursively dump children
+    auto childrenIt = m_parentToChildren.find(handle);
+    if (childrenIt != m_parentToChildren.end()) {
+        for (InstanceHandle childHandle : childrenIt->second) {
+            DumpElementRecursive(output, childHandle, false);
+        }
+    }
+}
 
 CMainDlg::CMainDlg(winrt::com_ptr<IXamlDiagnostics> diagnostics,
                    OnEventCallback_t eventCallback)
@@ -1836,83 +2053,8 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
             continue;
         }
 
-        std::wstring value;
-        bool valueShownAsIs = false;
-
-        if (v.MetadataBits & IsValueNull) {
-            value = L"(null)";
-        } else if (v.MetadataBits & IsValueHandle) {
-            InstanceHandle valueHandle =
-                static_cast<InstanceHandle>(std::wcstoll(v.Value, nullptr, 10));
-
-            std::wstring className;
-
-            wf::IInspectable valueObj;
-            HRESULT hr = m_xamlDiagnostics->GetIInspectableFromHandle(
-                valueHandle,
-                reinterpret_cast<::IInspectable**>(winrt::put_abi(valueObj)));
-            if (SUCCEEDED(hr)) {
-                className = winrt::get_class_name(valueObj);
-            } else {
-                className =
-                    std::format(L"Error {:08X}", static_cast<DWORD>(hr));
-            }
-
-            std::wstring extraInfo;
-            if (auto vector =
-                    valueObj
-                        .try_as<wf::Collections::IVector<wf::IInspectable>>()) {
-                extraInfo = std::format(L" {{Size={}}}", vector.Size());
-            } else if (auto val =
-                           valueObj.try_as<wux::Media::SolidColorBrush>()) {
-                auto color = val.Color();
-                extraInfo =
-                    color.A == 0xFF
-                        ? std::format(L" {{Color=#{:02X}{:02X}{:02X}}}",
-                                      color.R, color.G, color.B)
-                        : std::format(L" {{Color=#{:02X}{:02X}{:02X}{:02X}}}",
-                                      color.A, color.R, color.G, color.B);
-            } else if (auto val =
-                           valueObj.try_as<mux::Media::SolidColorBrush>()) {
-                auto color = val.Color();
-                extraInfo =
-                    color.A == 0xFF
-                        ? std::format(L" {{Color=#{:02X}{:02X}{:02X}}}",
-                                      color.R, color.G, color.B)
-                        : std::format(L" {{Color=#{:02X}{:02X}{:02X}{:02X}}}",
-                                      color.A, color.R, color.G, color.B);
-            } else if (auto val = valueObj.try_as<wux::Controls::Grid>()) {
-                extraInfo = std::format(L" {{Columns={}, Rows={}}}",
-                                        val.ColumnDefinitions().Size(),
-                                        val.RowDefinitions().Size());
-            } else if (auto val = valueObj.try_as<mux::Controls::Grid>()) {
-                extraInfo = std::format(L" {{Columns={}, Rows={}}}",
-                                        val.ColumnDefinitions().Size(),
-                                        val.RowDefinitions().Size());
-            } else if (auto val =
-                           valueObj.try_as<
-                               wux::Controls::ColumnDefinitionCollection>()) {
-                extraInfo = FormatColumnDefinitionCollection(val);
-            } else if (auto val =
-                           valueObj.try_as<
-                               mux::Controls::ColumnDefinitionCollection>()) {
-                extraInfo = FormatColumnDefinitionCollection(val);
-            } else if (auto val = valueObj.try_as<
-                                  wux::Controls::RowDefinitionCollection>()) {
-                extraInfo = FormatRowDefinitionCollection(val);
-            } else if (auto val = valueObj.try_as<
-                                  mux::Controls::RowDefinitionCollection>()) {
-                extraInfo = FormatRowDefinitionCollection(val);
-            }
-
-            value = std::format(
-                L"({}; {}{})",
-                (v.MetadataBits & IsValueCollection) ? L"collection" : L"data",
-                className, extraInfo);
-        } else {
-            value = v.Value;
-            valueShownAsIs = true;
-        }
+        auto [value, valueShownAsIs] =
+            FormatPropertyValue(v, m_xamlDiagnostics.get());
 
         int c = 0;
 
@@ -2162,8 +2304,9 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
     enum {
         MENU_ID_VISIBLE = 1,
         MENU_ID_COPY_ITEM,
-        MENU_ID_COPY_SUBTREE,
         MENU_ID_COPY_PATH,
+        MENU_ID_COPY_SUBTREE,
+        MENU_ID_COPY_SUBTREE_WITH_PROPERTIES,
     };
 
     auto handle = HandleFromLParam(targetItem.GetData());
@@ -2195,9 +2338,11 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
                         MENU_ID_VISIBLE, L"Visible");
         menu.AppendMenu(MF_SEPARATOR);
         menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
-        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"Copy subtree");
         menu.AppendMenu(MF_STRING | (isRoot ? MF_GRAYED : 0), MENU_ID_COPY_PATH,
                         L"Copy path");
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"Copy subtree");
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE_WITH_PROPERTIES,
+                        L"Copy subtree with properties");
 
         int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD,
                                        menuPoint.x, menuPoint.y, m_hWnd);
@@ -2220,8 +2365,15 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
                 if (!CopyTextToClipboard(
                         m_hWnd,
                         {itemText.GetString(), (size_t)itemText.GetLength()})) {
-                    MessageBox(L"Failed to copy item text to clipboard",
-                               L"Error");
+                    MessageBox(L"Failed to copy to clipboard", L"Error");
+                }
+                break;
+            }
+
+            case MENU_ID_COPY_PATH: {
+                std::wstring path = BuildElementPath(m_elementItems, handle);
+                if (!CopyTextToClipboard(m_hWnd, path)) {
+                    MessageBox(L"Failed to copy to clipboard", L"Error");
                 }
                 break;
             }
@@ -2231,17 +2383,22 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
                 TreeViewSubtreeToString(treeView, targetItem, str);
                 if (!CopyTextToClipboard(
                         m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
-                    MessageBox(L"Failed to copy subtree text to clipboard",
-                               L"Error");
+                    MessageBox(L"Failed to copy to clipboard", L"Error");
                 }
                 break;
             }
 
-            case MENU_ID_COPY_PATH: {
-                std::wstring path = BuildElementPath(m_elementItems, handle);
-                if (!CopyTextToClipboard(m_hWnd, path)) {
-                    MessageBox(L"Failed to copy path to clipboard", L"Error");
+            case MENU_ID_COPY_SUBTREE_WITH_PROPERTIES: {
+                std::wstring dump;
+                DumpElementRecursive(dump, handle, true);
+
+                if (!CopyTextToClipboard(m_hWnd, dump)) {
+                    MessageBox(L"Failed to copy to clipboard", L"Error");
+                    return;
                 }
+
+                MessageBox(L"Content copied successfully", L"Success",
+                           MB_OK | MB_ICONINFORMATION);
                 break;
             }
         }
