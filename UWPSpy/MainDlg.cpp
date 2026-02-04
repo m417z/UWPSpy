@@ -1773,10 +1773,7 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
         std::wstring value;
         bool valueShownAsIs = false;
 
-        if (m_detailedProperties) {
-            value = v.Value;
-            valueShownAsIs = true;
-        } else if (v.MetadataBits & IsValueNull) {
+        if (v.MetadataBits & IsValueNull) {
             value = L"(null)";
         } else if (v.MetadataBits & IsValueHandle) {
             InstanceHandle valueHandle =
