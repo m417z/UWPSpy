@@ -2,6 +2,8 @@
 
 #include "resource.h"
 
+#include "../common/dark_mode.h"
+
 class CSortListViewCtrlCustom : public CSortListViewCtrl {
     BEGIN_MSG_MAP(CSortListViewCtrlCustom)
         MSG_WM_CHAR(ProcessListOnChar)
@@ -40,6 +42,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         CHAIN_MSG_MAP(CDialogResize<CMainDlg>)
         MSG_WM_INITDIALOG(OnInitDialog)
         MSG_WM_TIMER(OnTimer)
+        MSG_WM_CTLCOLORDLG(OnCtlColorDlg)
+        MSG_WM_CTLCOLORSTATIC(OnCtlColorStatic)
+        MSG_WM_CTLCOLORBTN(OnCtlColorBtn)
+        MSG_WM_SETTINGCHANGE(OnSettingChange)
         COMMAND_ID_HANDLER_EX(ID_APP_ABOUT, OnAppAbout)
         COMMAND_ID_HANDLER_EX(IDOK, OnOK)
         COMMAND_ID_HANDLER_EX(IDC_REFRESH_BUTTON, OnRefresh)
@@ -52,6 +58,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     BOOL OnInitDialog(CWindow wndFocus, LPARAM lInitParam);
     void OnTimer(UINT_PTR nIDEvent);
+    HBRUSH OnCtlColorDlg(CDCHandle dc, CWindow wnd);
+    HBRUSH OnCtlColorStatic(CDCHandle dc, CStatic wndStatic);
+    HBRUSH OnCtlColorBtn(CDCHandle dc, CButton button);
+    void OnSettingChange(UINT uFlags, LPCTSTR lpszSection);
     void OnOK(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnRefresh(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnAppAbout(UINT uNotifyCode, int nID, CWindow wndCtl);
@@ -64,7 +74,22 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void InitProcessList();
     void LoadProcessList();
     void ProcessSpyFromList(int index);
+    void ApplyDarkMode();
+    static LRESULT CALLBACK ListViewSubclassProc(HWND hWnd,
+                                                 UINT uMsg,
+                                                 WPARAM wParam,
+                                                 LPARAM lParam,
+                                                 UINT_PTR uIdSubclass,
+                                                 DWORD_PTR dwRefData);
+    static LRESULT CALLBACK GripSubclassProc(HWND hWnd,
+                                             UINT uMsg,
+                                             WPARAM wParam,
+                                             LPARAM lParam,
+                                             UINT_PTR uIdSubclass,
+                                             DWORD_PTR dwRefData);
 
     CIcon m_icon, m_smallIcon;
     CSortListViewCtrlCustom m_processListSort;
+    bool m_darkMode = false;
+    CBrush m_darkBgBrush;
 };

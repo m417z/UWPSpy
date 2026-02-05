@@ -39,7 +39,61 @@ BOOL CAboutDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     titleStr.Replace(L"%s", VER_FILE_VERSION_WSTR);
     SetDlgItemText(IDC_ABOUT_TITLE, titleStr);
 
+    ApplyDarkMode();
+
     return TRUE;
+}
+
+void CAboutDlg::ApplyDarkMode() {
+    m_darkMode = dark_mode::IsSystemDarkMode();
+
+    dark_mode::SetDarkTitleBar(m_hWnd, m_darkMode);
+
+    if (m_darkMode && m_darkBgBrush.IsNull()) {
+        m_darkBgBrush.CreateSolidBrush(dark_mode::kDarkBg);
+    }
+
+    // Apply theme to all child controls.
+    for (HWND hChild = ::GetWindow(m_hWnd, GW_CHILD); hChild;
+         hChild = ::GetWindow(hChild, GW_HWNDNEXT)) {
+        dark_mode::SetControlTheme(hChild, m_darkMode);
+    }
+
+    InvalidateRect(nullptr, TRUE);
+}
+
+void CAboutDlg::OnSettingChange(UINT uFlags, LPCTSTR lpszSection) {
+    if (lpszSection && _wcsicmp(lpszSection, L"ImmersiveColorSet") == 0) {
+        ApplyDarkMode();
+    }
+}
+
+HBRUSH CAboutDlg::OnCtlColorDlg(CDCHandle dc, CWindow wnd) {
+    if (m_darkMode) {
+        return m_darkBgBrush;
+    }
+    SetMsgHandled(FALSE);
+    return nullptr;
+}
+
+HBRUSH CAboutDlg::OnCtlColorStatic(CDCHandle dc, CStatic wndStatic) {
+    if (m_darkMode) {
+        dc.SetTextColor(dark_mode::kDarkText);
+        dc.SetBkColor(dark_mode::kDarkBg);
+        return m_darkBgBrush;
+    }
+    SetMsgHandled(FALSE);
+    return nullptr;
+}
+
+HBRUSH CAboutDlg::OnCtlColorBtn(CDCHandle dc, CButton button) {
+    if (m_darkMode) {
+        dc.SetTextColor(dark_mode::kDarkText);
+        dc.SetBkColor(dark_mode::kDarkBg);
+        return m_darkBgBrush;
+    }
+    SetMsgHandled(FALSE);
+    return nullptr;
 }
 
 void CAboutDlg::OnButtonRamenSoftware(UINT uNotifyCode,

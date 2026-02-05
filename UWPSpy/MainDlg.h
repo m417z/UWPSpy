@@ -3,6 +3,8 @@
 #include "resource.h"
 #include "winrt.hpp"
 
+#include "../common/dark_mode.h"
+
 class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
    public:
     enum { IDD = IDD_MAINDLG };
@@ -42,6 +44,11 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         MSG_WM_NCACTIVATE(OnNcActivate)
         MSG_WM_TIMER(OnTimer)
         MSG_WM_CONTEXTMENU(OnContextMenu)
+        MSG_WM_CTLCOLORDLG(OnCtlColorDlg)
+        MSG_WM_CTLCOLORSTATIC(OnCtlColorStatic)
+        MSG_WM_CTLCOLORBTN(OnCtlColorBtn)
+        MSG_WM_CTLCOLOREDIT(OnCtlColorEdit)
+        MSG_WM_SETTINGCHANGE(OnSettingChange)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_SELCHANGED,
                           OnElementTreeSelChanged)
         COMMAND_ID_HANDLER_EX(IDC_SPLIT_TOGGLE, OnSplitToggle)
@@ -138,6 +145,11 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     BOOL OnNcActivate(BOOL bActive);
     void OnTimer(UINT_PTR nIDEvent);
     void OnContextMenu(CWindow wnd, CPoint point);
+    HBRUSH OnCtlColorDlg(CDCHandle dc, CWindow wnd);
+    HBRUSH OnCtlColorStatic(CDCHandle dc, CStatic wndStatic);
+    HBRUSH OnCtlColorBtn(CDCHandle dc, CButton button);
+    void OnSettingChange(UINT uFlags, LPCTSTR lpszSection);
+    HBRUSH OnCtlColorEdit(CDCHandle dc, CEdit wndEdit);
     LRESULT OnElementTreeSelChanged(LPNMHDR pnmh);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnDetailsTabsSelChange(LPNMHDR pnmh);
@@ -180,6 +192,25 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void DumpElementRecursive(std::wstring& output,
                               InstanceHandle handle,
                               bool isFirst);
+    void ApplyDarkMode();
+    static LRESULT CALLBACK ListViewSubclassProc(HWND hWnd,
+                                                 UINT uMsg,
+                                                 WPARAM wParam,
+                                                 LPARAM lParam,
+                                                 UINT_PTR uIdSubclass,
+                                                 DWORD_PTR dwRefData);
+    static LRESULT CALLBACK TabCtrlSubclassProc(HWND hWnd,
+                                                UINT uMsg,
+                                                WPARAM wParam,
+                                                LPARAM lParam,
+                                                UINT_PTR uIdSubclass,
+                                                DWORD_PTR dwRefData);
+    static LRESULT CALLBACK GripSubclassProc(HWND hWnd,
+                                             UINT uMsg,
+                                             WPARAM wParam,
+                                             LPARAM lParam,
+                                             UINT_PTR uIdSubclass,
+                                             DWORD_PTR dwRefData);
 
     CIcon m_icon, m_smallIcon;
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;
@@ -206,4 +237,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     CString m_lastPropertySelection;
 
     CWindow m_flashAreaWindow;
+
+    bool m_darkMode = false;
+    CBrush m_darkBgBrush;
 };

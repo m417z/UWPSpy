@@ -49,6 +49,16 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
 
     CheckDlgButton(IDC_RADIO_UWP, BST_CHECKED);
 
+    ::SetWindowSubclass(GetDlgItem(IDC_PROCESS_LIST), ListViewSubclassProc, 0,
+                        (DWORD_PTR)this);
+
+    HWND hGrip = GetDlgItem(ATL_IDW_STATUS_BAR);
+    if (hGrip) {
+        ::SetWindowSubclass(hGrip, GripSubclassProc, 0, (DWORD_PTR)this);
+    }
+
+    ApplyDarkMode();
+
     return TRUE;
 }
 
@@ -159,7 +169,6 @@ void CMainDlg::InitProcessList() {
 
     list.SetExtendedListViewStyle(LVS_EX_HEADERDRAGDROP | LVS_EX_FULLROWSELECT |
                                   LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
-    ::SetWindowTheme(list, L"Explorer", nullptr);
 
     using GetDpiForWindow_t = UINT(WINAPI*)(HWND hwnd);
     static GetDpiForWindow_t pGetDpiForWindow = []() {
@@ -245,6 +254,148 @@ void CMainDlg::LoadProcessList() {
     m_processListSort.RedrawWindow(
         nullptr, nullptr,
         RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
+}
+
+void CMainDlg::ApplyDarkMode() {
+    m_darkMode = dark_mode::IsSystemDarkMode();
+
+    dark_mode::SetPreferredAppMode(dark_mode::AppMode::AllowDark);
+
+    dark_mode::SetDarkTitleBar(m_hWnd, m_darkMode);
+
+    if (m_darkMode && m_darkBgBrush.IsNull()) {
+        m_darkBgBrush.CreateSolidBrush(dark_mode::kDarkBg);
+    }
+
+    // Apply theme to all child controls.
+    for (HWND hChild = ::GetWindow(m_hWnd, GW_CHILD); hChild;
+         hChild = ::GetWindow(hChild, GW_HWNDNEXT)) {
+        dark_mode::SetControlTheme(hChild, m_darkMode);
+    }
+
+    // List view header.
+    CHeaderCtrl header =
+        CListViewCtrl(GetDlgItem(IDC_PROCESS_LIST)).GetHeader();
+    if (header) {
+        dark_mode::SetControlTheme(header, m_darkMode);
+    }
+
+    // Manual list view colors as fallback.
+    {
+        auto lv = CListViewCtrl(GetDlgItem(IDC_PROCESS_LIST));
+        lv.SetBkColor(m_darkMode ? dark_mode::kDarkBg
+                                 : ::GetSysColor(COLOR_WINDOW));
+        lv.SetTextBkColor(m_darkMode ? dark_mode::kDarkBg
+                                     : ::GetSysColor(COLOR_WINDOW));
+        lv.SetTextColor(m_darkMode ? dark_mode::kDarkText
+                                   : ::GetSysColor(COLOR_WINDOWTEXT));
+    }
+
+    // Resize grip.
+    HWND hGrip = GetDlgItem(ATL_IDW_STATUS_BAR);
+    if (hGrip) {
+        dark_mode::SetControlTheme(hGrip, m_darkMode);
+    }
+
+    InvalidateRect(nullptr, TRUE);
+}
+
+HBRUSH CMainDlg::OnCtlColorDlg(CDCHandle dc, CWindow wnd) {
+    if (m_darkMode) {
+        return m_darkBgBrush;
+    }
+    SetMsgHandled(FALSE);
+    return nullptr;
+}
+
+HBRUSH CMainDlg::OnCtlColorStatic(CDCHandle dc, CStatic wndStatic) {
+    if (m_darkMode) {
+        dc.SetTextColor(dark_mode::kDarkText);
+        dc.SetBkColor(dark_mode::kDarkBg);
+        return m_darkBgBrush;
+    }
+    SetMsgHandled(FALSE);
+    return nullptr;
+}
+
+HBRUSH CMainDlg::OnCtlColorBtn(CDCHandle dc, CButton button) {
+    if (m_darkMode) {
+        dc.SetTextColor(dark_mode::kDarkText);
+        dc.SetBkColor(dark_mode::kDarkBg);
+        return m_darkBgBrush;
+    }
+    SetMsgHandled(FALSE);
+    return nullptr;
+}
+
+LRESULT CALLBACK CMainDlg::ListViewSubclassProc(HWND hWnd,
+                                                UINT uMsg,
+                                                WPARAM wParam,
+                                                LPARAM lParam,
+                                                UINT_PTR uIdSubclass,
+                                                DWORD_PTR dwRefData) {
+    auto* pThis = reinterpret_cast<CMainDlg*>(dwRefData);
+    if (uMsg == WM_NOTIFY && pThis->m_darkMode) {
+        auto* nmhdr = reinterpret_cast<LPNMHDR>(lParam);
+        if (nmhdr->code == NM_CUSTOMDRAW) {
+            auto* nmcd = reinterpret_cast<LPNMCUSTOMDRAW>(lParam);
+            if (nmcd->dwDrawStage == CDDS_PREPAINT) {
+                return CDRF_NOTIFYITEMDRAW;
+            }
+            if (nmcd->dwDrawStage == CDDS_ITEMPREPAINT) {
+                ::SetTextColor(nmcd->hdc, dark_mode::kDarkText);
+                return CDRF_DODEFAULT;
+            }
+        }
+    }
+    return ::DefSubclassProc(hWnd, uMsg, wParam, lParam);
+}
+
+LRESULT CALLBACK CMainDlg::GripSubclassProc(HWND hWnd,
+                                            UINT uMsg,
+                                            WPARAM wParam,
+                                            LPARAM lParam,
+                                            UINT_PTR uIdSubclass,
+                                            DWORD_PTR dwRefData) {
+    auto* pThis = reinterpret_cast<CMainDlg*>(dwRefData);
+    if (pThis->m_darkMode) {
+        if (uMsg == WM_ERASEBKGND) {
+            return 1;
+        }
+        if (uMsg == WM_PAINT) {
+            PAINTSTRUCT ps;
+            HDC hdc = ::BeginPaint(hWnd, &ps);
+            RECT rc;
+            ::GetClientRect(hWnd, &rc);
+            ::FillRect(hdc, &rc, pThis->m_darkBgBrush);
+
+            // Draw grip dots.
+            HBRUSH hDotBrush = ::CreateSolidBrush(RGB(96, 96, 96));
+            int d = 2;
+            int s = 4;
+            int x0 = rc.right - 3;
+            int y0 = rc.bottom - 3;
+            for (int diag = 0; diag < 3; diag++) {
+                for (int i = 0; i <= diag; i++) {
+                    int x = x0 - (diag - i) * s;
+                    int y = y0 - i * s;
+                    RECT dot = {x - d, y - d, x, y};
+                    ::FillRect(hdc, &dot, hDotBrush);
+                }
+            }
+            ::DeleteObject(hDotBrush);
+
+            ::EndPaint(hWnd, &ps);
+            return 0;
+        }
+    }
+    return ::DefSubclassProc(hWnd, uMsg, wParam, lParam);
+}
+
+void CMainDlg::OnSettingChange(UINT uFlags, LPCTSTR lpszSection) {
+    if (lpszSection && _wcsicmp(lpszSection, L"ImmersiveColorSet") == 0) {
+        ApplyDarkMode();
+    }
 }
 
 void CMainDlg::ProcessSpyFromList(int index) {
