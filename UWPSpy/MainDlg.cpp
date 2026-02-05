@@ -1110,7 +1110,7 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
 void CMainDlg::OnDestroy() {}
 
 BOOL CMainDlg::OnNcActivate(BOOL bActive) {
-    if (!bActive && m_sticky) {
+    if (!bActive && m_sticky && IsWindowEnabled()) {
         // Prevent the window from being deactivated.
         return FALSE;
     }
@@ -1386,10 +1386,16 @@ bool CMainDlg::CreateFlashArea(InstanceHandle handle) {
         return true;
     }
 
-    m_flashAreaWindow =
-        FlashArea(m_hWnd, _Module.GetModuleInstance(), rect, IsWindowVisible());
+    m_flashAreaWindow = FlashArea(rootWnd, _Module.GetModuleInstance(), rect,
+                                  IsWindowVisible());
     if (!m_flashAreaWindow) {
         return false;
+    }
+
+    // Keep the current window on top.
+    if (GetForegroundWindow() == m_hWnd) {
+        SetWindowPos(nullptr, 0, 0, 0, 0,
+                     SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
     }
 
     return true;

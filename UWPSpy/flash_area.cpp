@@ -371,8 +371,6 @@ HBITMAP MakeFlashWindowBitmap(HMODULE hModule, RECT rc) {
 HWND FlashArea(HWND hParentWnd, HMODULE hModule, const RECT& rc, bool show) {
     static BOOL fInitializedWindowClass = FALSE;
 
-    HWND hwnd;
-
     if (!fInitializedWindowClass) {
         WNDCLASSEX wc = {sizeof(wc)};
 
@@ -385,22 +383,21 @@ HWND FlashArea(HWND hParentWnd, HMODULE hModule, const RECT& rc, bool show) {
         fInitializedWindowClass = TRUE;
     }
 
-    hwnd = CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
-                          WC_FLASHWINDOW, 0, WS_POPUP, rc.left, rc.top,
-                          rc.right - rc.left, rc.bottom - rc.top, hParentWnd, 0,
-                          0, NULL);
+    HWND hwnd = CreateWindowEx(
+        WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_LAYERED, WC_FLASHWINDOW, 0,
+        WS_POPUP, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
+        hParentWnd, 0, 0, NULL);
 
     if (hwnd) {
         HBITMAP hbmp = MakeFlashWindowBitmap(hModule, rc);
         UpdateLayeredWindowContent(hwnd, rc, hbmp, ALPHA_LEVEL);
         DeleteObject(hbmp);
 
-        UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
         if (show) {
-            flags |= SWP_SHOWWINDOW;
+            SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE |
+                             SWP_NOZORDER | SWP_SHOWWINDOW);
         }
-
-        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags);
     }
 
     return hwnd;
