@@ -1225,6 +1225,11 @@ LRESULT CALLBACK CMainDlg::TabCtrlSubclassProc(HWND hWnd,
             for (int i = 0; i < count; i++) {
                 RECT rcTab;
                 TabCtrl_GetItemRect(hWnd, i, &rcTab);
+                if (i == count - 1 && TabCtrl_GetCurSel(hWnd) != i) {
+                    // If the last tab is not selected, it has extra space to
+                    // the right that should also be excluded from overpainting.
+                    rcTab.right -= ::MulDiv(2, ::GetDpiForWindow(hWnd), 96);
+                }
                 HRGN hTabRgn = ::CreateRectRgnIndirect(&rcTab);
                 ::CombineRgn(hRgn, hRgn, hTabRgn, RGN_DIFF);
                 ::DeleteObject(hTabRgn);
@@ -1650,6 +1655,7 @@ void CMainDlg::OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl) {
     HWND hGrip = GetDlgItem(ATL_IDW_STATUS_BAR);
     if (hGrip) {
         ::SetWindowSubclass(hGrip, GripSubclassProc, 0, (DWORD_PTR)this);
+        ::InvalidateRect(hGrip, nullptr, FALSE);
     }
 }
 
