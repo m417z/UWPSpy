@@ -108,6 +108,22 @@ void TreeViewToString(CTreeViewCtrlEx tree, CString& str) {
     }
 }
 
+std::wstring_view ShortenClassName(std::wstring_view className) {
+    if (className == L"Windows.UI.Xaml.Shapes.Rectangle") {
+        return L"Rectangle";
+    }
+
+    constexpr std::wstring_view kControlsPrefix = L"Windows.UI.Xaml.Controls.";
+    if (className.substr(0, kControlsPrefix.size()) == kControlsPrefix) {
+        auto shortName = className.substr(kControlsPrefix.size());
+        if (shortName.find_first_of(L".:") == std::wstring_view::npos) {
+            return shortName;
+        }
+    }
+
+    return className;
+}
+
 std::wstring BuildElementPath(
     const std::unordered_map<InstanceHandle, CMainDlg::ElementItem>&
         elementItems,
@@ -137,13 +153,14 @@ std::wstring BuildElementPath(
         size_t separatorPos = itemTitle.find(L" - ");
         if (separatorPos != std::wstring::npos) {
             // Has name, format as "ClassName#Name"
-            std::wstring className = itemTitle.substr(0, separatorPos);
-            // Skip " - "
-            std::wstring name = itemTitle.substr(separatorPos + 3);
-            component = className + L"#" + name;
+            auto className = ShortenClassName(
+                std::wstring_view(itemTitle).substr(0, separatorPos));
+            std::wstring_view name =
+                std::wstring_view(itemTitle).substr(separatorPos + 3);
+            component = std::wstring(className) + L"#" + std::wstring(name);
         } else {
             // No name, just use ClassName
-            component = itemTitle;
+            component = ShortenClassName(itemTitle);
         }
 
         pathComponents.push_back(component);
