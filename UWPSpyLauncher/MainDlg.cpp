@@ -363,10 +363,11 @@ LRESULT CALLBACK CMainDlg::GripSubclassProc(HWND hWnd,
 
             // Draw grip dots.
             HBRUSH hDotBrush = ::CreateSolidBrush(RGB(96, 96, 96));
-            int d = 2;
-            int s = 4;
-            int x0 = rc.right - 3;
-            int y0 = rc.bottom - 3;
+            UINT dpi = ::GetDpiForWindow(hWnd);
+            int d = ::MulDiv(2, dpi, 96);
+            int s = ::MulDiv(4, dpi, 96);
+            int x0 = rc.right - ::MulDiv(3, dpi, 96);
+            int y0 = rc.bottom - ::MulDiv(3, dpi, 96);
             for (int diag = 0; diag < 3; diag++) {
                 for (int i = 0; i <= diag; i++) {
                     int x = x0 - (diag - i) * s;
