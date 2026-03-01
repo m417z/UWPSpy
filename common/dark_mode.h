@@ -26,7 +26,7 @@ inline bool IsSupportedBuild() {
 
     DWORD major = 0, minor = 0, build = 0;
     fn(&major, &minor, &build);
-    build &= ~0x80000000UL;
+    build &= ~0xF0000000;
 
     // Future OS versions: assume supported.
     if (major > 10 || (major == 10 && minor > 0) ||
