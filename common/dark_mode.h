@@ -11,16 +11,10 @@ constexpr COLORREF kDarkText = RGB(240, 240, 240);
 // DarkMode_DarkTheme support.
 // https://github.com/ozone10/darkmodelib/issues/8
 inline bool IsSupportedBuild() {
-    static int cached = -1;
-    if (cached >= 0) {
-        return cached != 0;
-    }
-
     using FnRtlGetNtVersionNumbers = void(WINAPI*)(DWORD*, DWORD*, DWORD*);
     auto fn = reinterpret_cast<FnRtlGetNtVersionNumbers>(::GetProcAddress(
         ::GetModuleHandleW(L"ntdll.dll"), "RtlGetNtVersionNumbers"));
     if (!fn) {
-        cached = 0;
         return false;
     }
 
@@ -31,13 +25,11 @@ inline bool IsSupportedBuild() {
     // Future OS versions: assume supported.
     if (major > 10 || (major == 10 && minor > 0) ||
         (major == 10 && minor == 0 && build > 26200)) {
-        cached = 1;
         return true;
     }
 
     // Need at least Win11 24H2 (build 26100).
     if (major < 10 || (major == 10 && minor == 0 && build < 26100)) {
-        cached = 0;
         return false;
     }
 
@@ -47,8 +39,7 @@ inline bool IsSupportedBuild() {
     ::RegGetValue(HKEY_LOCAL_MACHINE,
                   L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", L"UBR",
                   RRF_RT_REG_DWORD, nullptr, &ubr, &ubrSize);
-    cached = (ubr >= 6899) ? 1 : 0;
-    return cached != 0;
+    return ubr >= 6899;
 }
 
 inline const VS_FIXEDFILEINFO* GetModuleVersionInfo(HMODULE hModule) {
@@ -75,22 +66,22 @@ inline const VS_FIXEDFILEINFO* GetModuleVersionInfo(HMODULE hModule) {
 }
 
 inline bool IsComCtlV6() {
-    static int cached = -1;
-    if (cached >= 0) {
-        return cached != 0;
-    }
     HMODULE hComCtl = ::GetModuleHandleW(L"comctl32.dll");
     if (!hComCtl) {
-        cached = 0;
         return false;
     }
     auto* vi = GetModuleVersionInfo(hComCtl);
-    cached = (vi && HIWORD(vi->dwFileVersionMS) >= 6) ? 1 : 0;
-    return cached != 0;
+    return vi && HIWORD(vi->dwFileVersionMS) >= 6;
 }
 
 inline bool IsSystemDarkMode() {
-    if (!IsSupportedBuild() || !IsComCtlV6()) {
+    static bool isSupportedBuild = IsSupportedBuild();
+    if (!isSupportedBuild) {
+        return false;
+    }
+
+    static bool isComCtlV6 = IsComCtlV6();
+    if (!isComCtlV6) {
         return false;
     }
 
