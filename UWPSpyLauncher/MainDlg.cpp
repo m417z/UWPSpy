@@ -170,15 +170,7 @@ void CMainDlg::InitProcessList() {
     list.SetExtendedListViewStyle(LVS_EX_HEADERDRAGDROP | LVS_EX_FULLROWSELECT |
                                   LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
 
-    using GetDpiForWindow_t = UINT(WINAPI*)(HWND hwnd);
-    static GetDpiForWindow_t pGetDpiForWindow = []() {
-        HMODULE hUser32 = GetModuleHandle(L"user32.dll");
-        return (GetDpiForWindow_t)(hUser32 ? GetProcAddress(hUser32,
-                                                            "GetDpiForWindow")
-                                           : nullptr);
-    }();
-
-    UINT windowDpi = pGetDpiForWindow ? pGetDpiForWindow(m_hWnd) : 96;
+    UINT windowDpi = ::GetDpiForWindow(m_hWnd);
 
     // Sort PIDs as decimals, signed 128-bit (16-byte) values representing
     // 96-bit (12-byte) integer numbers:
