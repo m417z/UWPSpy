@@ -75,6 +75,16 @@ inline bool IsComCtlV6() {
 }
 
 inline bool IsSystemDarkModeSupported() {
+    static bool disabledViaEnvVar = [] {
+        WCHAR value[16];
+        DWORD size = ::GetEnvironmentVariableW(L"UWPSPY_DISABLE_DARK_MODE",
+                                               value, ARRAYSIZE(value));
+        return size > 0 && size < ARRAYSIZE(value) && wcscmp(value, L"1") == 0;
+    }();
+    if (disabledViaEnvVar) {
+        return false;
+    }
+
     static bool isSupportedBuild = IsSupportedBuild();
     if (!isSupportedBuild) {
         return false;
