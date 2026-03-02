@@ -45,7 +45,11 @@ BOOL CAboutDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
 }
 
 void CAboutDlg::ApplyDarkMode() {
-    m_darkMode = dark_mode::IsSystemDarkMode();
+    if (!dark_mode::IsSystemDarkModeSupported()) {
+        return;
+    }
+
+    m_darkMode = dark_mode::IsSystemDarkModeActive();
 
     dark_mode::SetDarkTitleBar(m_hWnd, m_darkMode);
 

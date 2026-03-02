@@ -249,7 +249,13 @@ void CMainDlg::LoadProcessList() {
 }
 
 void CMainDlg::ApplyDarkMode() {
-    m_darkMode = dark_mode::IsSystemDarkMode();
+    if (!dark_mode::IsSystemDarkModeSupported()) {
+        auto list = GetDlgItem(IDC_PROCESS_LIST);
+        ::SetWindowTheme(list, L"Explorer", nullptr);
+        return;
+    }
+
+    m_darkMode = dark_mode::IsSystemDarkModeActive();
 
     dark_mode::SetPreferredAppMode(dark_mode::AppMode::AllowDark);
 

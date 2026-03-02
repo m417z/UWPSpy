@@ -1136,7 +1136,18 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
 void CMainDlg::OnDestroy() {}
 
 void CMainDlg::ApplyDarkMode() {
-    m_darkMode = dark_mode::IsSystemDarkMode();
+    if (!dark_mode::IsSystemDarkModeSupported()) {
+        auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+        ::SetWindowTheme(treeView, L"Explorer", nullptr);
+        auto attributesList = CListViewCtrl(GetDlgItem(IDC_ATTRIBUTE_LIST));
+        ::SetWindowTheme(attributesList, L"Explorer", nullptr);
+        auto visualStatesTree =
+            CTreeViewCtrlEx(GetDlgItem(IDC_VISUAL_STATE_TREE));
+        ::SetWindowTheme(visualStatesTree, L"Explorer", nullptr);
+        return;
+    }
+
+    m_darkMode = dark_mode::IsSystemDarkModeActive();
 
     dark_mode::SetDarkTitleBar(m_hWnd, m_darkMode);
 

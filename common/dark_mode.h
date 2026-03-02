@@ -74,7 +74,7 @@ inline bool IsComCtlV6() {
     return vi && HIWORD(vi->dwFileVersionMS) >= 6;
 }
 
-inline bool IsSystemDarkMode() {
+inline bool IsSystemDarkModeSupported() {
     static bool isSupportedBuild = IsSupportedBuild();
     if (!isSupportedBuild) {
         return false;
@@ -82,6 +82,14 @@ inline bool IsSystemDarkMode() {
 
     static bool isComCtlV6 = IsComCtlV6();
     if (!isComCtlV6) {
+        return false;
+    }
+
+    return true;
+}
+
+inline bool IsSystemDarkModeActive() {
+    if (!IsSystemDarkModeSupported()) {
         return false;
     }
 
