@@ -1256,7 +1256,8 @@ LRESULT CALLBACK CMainDlg::TabCtrlSubclassProc(HWND hWnd,
                 if (i == count - 1 && TabCtrl_GetCurSel(hWnd) != i) {
                     // If the last tab is not selected, it has extra space to
                     // the right that should also be excluded from overpainting.
-                    rcTab.right -= ::MulDiv(2, ::GetDpiForWindow(hWnd), 96);
+                    // This seems to be 2 pixels regardless of DPI.
+                    rcTab.right -= 2;
                 }
                 HRGN hTabRgn = ::CreateRectRgnIndirect(&rcTab);
                 ::CombineRgn(hRgn, hRgn, hTabRgn, RGN_DIFF);
