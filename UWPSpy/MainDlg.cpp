@@ -278,7 +278,16 @@ std::optional<CRect> GetRelativeElementRect(wf::IInspectable element) {
     if (auto uiElement = element.try_as<wux::UIElement>()) {
         offset = uiElement.TransformToVisual(nullptr).TransformPoint(
             wf::Point(0, 0));
-        size = uiElement.ActualSize();
+        if (auto uiElement10 = uiElement.try_as<wux::IUIElement10>()) {
+            // Available from build 18362.
+            size = uiElement.ActualSize();
+        } else if (auto frameworkElement =
+                       element.try_as<wux::FrameworkElement>()) {
+            size = {
+                static_cast<float>(frameworkElement.ActualWidth()),
+                static_cast<float>(frameworkElement.ActualHeight()),
+            };
+        }
     } else if (auto uiElement = element.try_as<mux::UIElement>()) {
         offset = uiElement.TransformToVisual(nullptr).TransformPoint(
             wf::Point(0, 0));
