@@ -30,6 +30,16 @@ APIs](https://learn.microsoft.com/en-us/windows/win32/api/xamlom/nf-xamlom-initi
 which were added in Windows 10, version 1703. Earlier versions of Windows are
 not supported.
 
+## Dark mode support
+
+UWPSpy supports dark mode on Windows 11 24H2 (build 26100.6899+) and 25H2 (build
+26200.6899+). When the system dark mode setting is enabled, UWPSpy will
+automatically use a dark theme.
+
+To disable dark mode (e.g. if you use custom theming or encounter visual
+issues), set the environment variable `UWPSPY_DISABLE_DARK_MODE=1` before
+launching.
+
 ## References
 
 - The
