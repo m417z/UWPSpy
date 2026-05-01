@@ -13,6 +13,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         TIMER_ID_REDRAW_TREE = 1,
         TIMER_ID_SET_SELECTED_ELEMENT_INFORMATION,
         TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION,
+        TIMER_ID_COPY_SUBTREE_DELAYED,
     };
 
     enum {
@@ -235,6 +236,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         m_parentToChildren;
 
     CString m_lastPropertySelection;
+
+    InstanceHandle m_delayedCopySubtreeHandle = 0;
+    bool m_delayedCopySubtreeWithProperties = false;
 
     CWindow m_flashAreaWindow;
 

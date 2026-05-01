@@ -1401,6 +1401,51 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
             KillTimer(nIDEvent);
             RefreshSelectedElementInformation(0);
             break;
+
+        case TIMER_ID_COPY_SUBTREE_DELAYED: {
+            KillTimer(nIDEvent);
+
+            InstanceHandle handle = m_delayedCopySubtreeHandle;
+            bool withProperties = m_delayedCopySubtreeWithProperties;
+            m_delayedCopySubtreeHandle = 0;
+            m_delayedCopySubtreeWithProperties = false;
+
+            auto it = m_elementItems.find(handle);
+            if (it == m_elementItems.end()) {
+                MessageBox(L"Element no longer exists", L"Error");
+                break;
+            }
+
+            try {
+                bool copied;
+                if (withProperties) {
+                    std::wstring dump;
+                    DumpElementRecursive(dump, handle, true);
+                    copied = CopyTextToClipboard(m_hWnd, dump);
+                } else {
+                    auto treeView =
+                        CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+                    CString str;
+                    TreeViewSubtreeToString(treeView, it->second.treeItem, str);
+                    copied = CopyTextToClipboard(
+                        m_hWnd, {str.GetString(), (size_t)str.GetLength()});
+                }
+
+                if (!copied) {
+                    MessageBox(L"Failed to copy to clipboard", L"Error");
+                    break;
+                }
+
+                MessageBox(L"Content copied successfully", L"Success",
+                           MB_OK | MB_ICONINFORMATION);
+            } catch (...) {
+                HRESULT hr = winrt::to_hresult();
+                auto errorMsg =
+                    std::format(L"Error {:08X}", static_cast<DWORD>(hr));
+                MessageBox(errorMsg.c_str(), L"Error");
+            }
+            break;
+        }
     }
 }
 
@@ -2565,7 +2610,9 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
         MENU_ID_COPY_ITEM,
         MENU_ID_COPY_PATH,
         MENU_ID_COPY_SUBTREE,
+        MENU_ID_COPY_SUBTREE_DELAYED,
         MENU_ID_COPY_SUBTREE_WITH_PROPERTIES,
+        MENU_ID_COPY_SUBTREE_WITH_PROPERTIES_DELAYED,
     };
 
     auto handle = HandleFromLParam(targetItem.GetData());
@@ -2600,8 +2647,12 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
         menu.AppendMenu(MF_STRING | (isRoot ? MF_GRAYED : 0), MENU_ID_COPY_PATH,
                         L"Copy path");
         menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE, L"Copy subtree");
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE_DELAYED,
+                        L"Copy subtree (10 seconds delay)");
         menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE_WITH_PROPERTIES,
                         L"Copy subtree with properties");
+        menu.AppendMenu(MF_STRING, MENU_ID_COPY_SUBTREE_WITH_PROPERTIES_DELAYED,
+                        L"Copy subtree with properties (10 seconds delay)");
 
         int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD,
                                        menuPoint.x, menuPoint.y, m_hWnd);
@@ -2660,6 +2711,18 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
                            MB_OK | MB_ICONINFORMATION);
                 break;
             }
+
+            case MENU_ID_COPY_SUBTREE_DELAYED:
+                m_delayedCopySubtreeHandle = handle;
+                m_delayedCopySubtreeWithProperties = false;
+                SetTimer(TIMER_ID_COPY_SUBTREE_DELAYED, 10000);
+                break;
+
+            case MENU_ID_COPY_SUBTREE_WITH_PROPERTIES_DELAYED:
+                m_delayedCopySubtreeHandle = handle;
+                m_delayedCopySubtreeWithProperties = true;
+                SetTimer(TIMER_ID_COPY_SUBTREE_DELAYED, 10000);
+                break;
         }
     } catch (...) {
         HRESULT hr = winrt::to_hresult();
