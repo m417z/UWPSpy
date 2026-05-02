@@ -125,6 +125,7 @@ std::wstring_view ShortenClassName(std::wstring_view className) {
 }
 
 std::wstring BuildElementPath(
+    IXamlDiagnostics* xamlDiagnostics,
     const std::unordered_map<InstanceHandle, CMainDlg::ElementItem>&
         elementItems,
     InstanceHandle handle) {
@@ -140,27 +141,48 @@ std::wstring BuildElementPath(
 
         const auto& elementItem = it->second;
 
-        // Stop before adding root element (root has parentHandle == 0)
+        // Stop before adding root element (root has parentHandle == 0).
         if (!elementItem.parentHandle) {
             break;
         }
 
-        // Parse itemTitle to extract ClassName and Name
-        // Format is "ClassName - Name" or just "ClassName"
-        const std::wstring& itemTitle = elementItem.itemTitle;
-        std::wstring component;
+        // Prefer the runtime class name, since it can differ from the declared
+        // type stored in itemTitle (e.g. when an instance is actually a more
+        // specific subclass).
+        std::wstring runtimeClassName;
+        wf::IInspectable obj;
+        if (SUCCEEDED(xamlDiagnostics->GetIInspectableFromHandle(
+                currentHandle,
+                reinterpret_cast<::IInspectable**>(winrt::put_abi(obj))))) {
+            try {
+                runtimeClassName = winrt::get_class_name(obj);
+            } catch (...) {
+                // Fall back to itemTitle below.
+            }
+        }
 
+        // Parse itemTitle to extract the displayed ClassName and Name.
+        // Format is "ClassName - Name" or just "ClassName".
+        const std::wstring& itemTitle = elementItem.itemTitle;
         size_t separatorPos = itemTitle.find(L" - ");
-        if (separatorPos != std::wstring::npos) {
+        std::wstring_view displayedClassName =
+            separatorPos != std::wstring::npos
+                ? std::wstring_view(itemTitle).substr(0, separatorPos)
+                : std::wstring_view(itemTitle);
+        std::wstring_view name =
+            separatorPos != std::wstring::npos
+                ? std::wstring_view(itemTitle).substr(separatorPos + 3)
+                : std::wstring_view();
+
+        std::wstring_view className = !runtimeClassName.empty()
+                                          ? std::wstring_view(runtimeClassName)
+                                          : displayedClassName;
+
+        std::wstring component(ShortenClassName(className));
+        if (!name.empty()) {
             // Has name, format as "ClassName#Name"
-            auto className = ShortenClassName(
-                std::wstring_view(itemTitle).substr(0, separatorPos));
-            std::wstring_view name =
-                std::wstring_view(itemTitle).substr(separatorPos + 3);
-            component = std::wstring(className) + L"#" + std::wstring(name);
-        } else {
-            // No name, just use ClassName
-            component = ShortenClassName(itemTitle);
+            component += L"#";
+            component += name;
         }
 
         pathComponents.push_back(component);
@@ -769,7 +791,8 @@ void CMainDlg::DumpElementRecursive(std::wstring& output,
     }
 
     // Build and write path
-    std::wstring path = BuildElementPath(m_elementItems, handle);
+    std::wstring path =
+        BuildElementPath(m_xamlDiagnostics.get(), m_elementItems, handle);
     output += L"Path: ";
     output += path.empty() ? L"(root)" : path;
     output += L"\n";
@@ -2681,7 +2704,8 @@ void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
             }
 
             case MENU_ID_COPY_PATH: {
-                std::wstring path = BuildElementPath(m_elementItems, handle);
+                std::wstring path = BuildElementPath(m_xamlDiagnostics.get(),
+                                                     m_elementItems, handle);
                 if (!CopyTextToClipboard(m_hWnd, path)) {
                     MessageBox(L"Failed to copy to clipboard", L"Error");
                 }
