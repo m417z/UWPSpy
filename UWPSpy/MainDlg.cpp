@@ -204,6 +204,48 @@ std::wstring BuildElementPath(
     return path;
 }
 
+// Returns true if the element is a known UI element that crashes when its
+// visual state groups are enumerated. The taskbar search box has layouts where
+// VisualStateManager::GetVisualStateGroups returns a list of size 1, but
+// accessing the first item leads to a null dereference crash.
+bool IsUnsupportedForVisualStates(const wux::FrameworkElement& element) {
+    if (!element) {
+        return false;
+    }
+
+    struct {
+        std::wstring_view className;
+        std::wstring_view parentClassName;
+    } unsupportedPairs[] = {
+        // The TaskListButtonPanel child of the search box (with "Icon and
+        // label" configuration).
+        {
+            L"Taskbar.TaskListButtonPanel",
+            L"Taskbar.SearchBoxLaunchListButton",
+        },
+        // Same as above for an updated element layout (around Jun 2025).
+        {
+            L"SearchUx.SearchUI.SearchButtonRootGrid",
+            L"SearchUx.SearchUI.SearchPillButton",
+        },
+    };
+
+    auto className = winrt::get_class_name(element);
+    for (const auto& pair : unsupportedPairs) {
+        if (className != pair.className) {
+            continue;
+        }
+
+        auto parent = wux::Media::VisualTreeHelper::GetParent(element)
+                          .try_as<wux::FrameworkElement>();
+        if (parent && winrt::get_class_name(parent) == pair.parentClassName) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool IsTreeItemInView(CTreeItem treeItem) {
     CRect rect;
     if (!treeItem.GetRect(rect, FALSE)) {
@@ -908,6 +950,66 @@ void CMainDlg::DumpElementRecursive(std::wstring& output,
     } else {
         output += L"Properties:\n";
         output += L"(no properties available)\n";
+    }
+
+    // Write visual states (only if any exist)
+    if (obj) {
+        try {
+            auto wuiFrameworkElement = obj.try_as<wux::FrameworkElement>();
+            auto muiFrameworkElement =
+                wuiFrameworkElement ? mux::FrameworkElement{nullptr}
+                                    : obj.try_as<mux::FrameworkElement>();
+
+            // A workaround for a taskbar search box inspection crash.
+            if (!IsUnsupportedForVisualStates(wuiFrameworkElement)) {
+                auto appendGroups = [&output](auto visualStateGroups) {
+                    bool hasGroups = false;
+                    for (const auto& group : visualStateGroups) {
+                        if (!hasGroups) {
+                            output += L"Visual states:\n";
+                            hasGroups = true;
+                        }
+
+                        std::wstring groupName(group.Name());
+                        if (groupName.empty()) {
+                            groupName = L"(unnamed)";
+                        }
+
+                        output += L"- ";
+                        output += groupName;
+                        output += L":\n";
+
+                        auto currentState = group.CurrentState();
+
+                        for (auto state : group.States()) {
+                            std::wstring name(state.Name());
+                            if (name.empty()) {
+                                name = L"(unnamed)";
+                            }
+
+                            if (state == currentState) {
+                                name += L" (current)";
+                            }
+
+                            output += L"  - ";
+                            output += name;
+                            output += L"\n";
+                        }
+                    }
+                };
+
+                if (wuiFrameworkElement) {
+                    appendGroups(wux::VisualStateManager::GetVisualStateGroups(
+                        wuiFrameworkElement));
+                } else if (muiFrameworkElement) {
+                    appendGroups(mux::VisualStateManager::GetVisualStateGroups(
+                        muiFrameworkElement));
+                }
+            }
+        } catch (...) {
+            // Silently skip on error - visual states are optional, and if
+            // there are none, the output should not be affected.
+        }
     }
 
     // Recursively dump children
@@ -2445,33 +2547,8 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
                                 : element.try_as<mux::FrameworkElement>();
 
         // A workaround for a taskbar search box inspection crash.
-        if (wuiFrameworkElement) {
-            auto& element = wuiFrameworkElement;
-
-            // The TaskListButtonPanel child element of the search box (with
-            // "Icon and label" configuration) returns a list of size 1, but
-            // accessing the first item leads to a null dereference crash. Skip
-            // this element.
-            if (winrt::get_class_name(element) ==
-                L"Taskbar.TaskListButtonPanel") {
-                auto parent = wux::Media::VisualTreeHelper::GetParent(element)
-                                  .try_as<wux::FrameworkElement>();
-                if (parent && winrt::get_class_name(parent) ==
-                                  L"Taskbar.SearchBoxLaunchListButton") {
-                    throw std::runtime_error("Unsupported element");
-                }
-            }
-
-            // Same as above for an updated element layout (around Jun 2025).
-            if (winrt::get_class_name(element) ==
-                L"SearchUx.SearchUI.SearchButtonRootGrid") {
-                auto parent = wux::Media::VisualTreeHelper::GetParent(element)
-                                  .try_as<wux::FrameworkElement>();
-                if (parent && winrt::get_class_name(parent) ==
-                                  L"SearchUx.SearchUI.SearchPillButton") {
-                    throw std::runtime_error("Unsupported element");
-                }
-            }
+        if (IsUnsupportedForVisualStates(wuiFrameworkElement)) {
+            throw std::runtime_error("Unsupported element");
         }
 
         auto populateList = [&visualStatesTree](auto visualStateGroups) {
