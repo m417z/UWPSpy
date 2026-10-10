@@ -108,6 +108,16 @@ void TreeViewToString(CTreeViewCtrlEx tree, CString& str) {
     }
 }
 
+bool ContainsCaseInsensitive(std::wstring_view str, std::wstring_view substr) {
+    if (substr.empty()) {
+        return true;
+    }
+
+    return ::FindStringOrdinal(FIND_FROMSTART, str.data(),
+                               static_cast<int>(str.size()), substr.data(),
+                               static_cast<int>(substr.size()), TRUE) != -1;
+}
+
 std::wstring_view ShortenClassName(std::wstring_view className) {
     if (className == L"Windows.UI.Xaml.Shapes.Rectangle") {
         return L"Rectangle";
@@ -1225,6 +1235,16 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
                       reinterpret_cast<POINT*>(&detailsTabsRect),
                       sizeof(RECT) / sizeof(POINT));
 
+    m_attributeFilterEdit.Init(GetDlgItem(IDC_ATTRIBUTE_FILTER),
+                               L"Filter (Ctrl+F)");
+    m_attributeFilterEdit.SetKeyDownHandler(
+        [this](UINT nChar) { return AttributeFilterOnKeyDown(nChar); });
+    CRect attributeFilterRect;
+    m_attributeFilterEdit.GetWindowRect(&attributeFilterRect);
+    ::MapWindowPoints(nullptr, m_hWnd,
+                      reinterpret_cast<POINT*>(&attributeFilterRect),
+                      sizeof(RECT) / sizeof(POINT));
+
     CListViewCtrl attributesList(GetDlgItem(IDC_ATTRIBUTE_LIST));
     m_attributesList.SubclassWindow(attributesList);
     attributesList.SetExtendedListViewStyle(
@@ -1235,7 +1255,9 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     ::MapWindowPoints(nullptr, m_hWnd,
                       reinterpret_cast<POINT*>(&attributesListRect),
                       sizeof(RECT) / sizeof(POINT));
-    attributesListRect.top = detailsTabsRect.bottom;
+    // Below the filter, with the same gap as between the tabs and the filter.
+    attributesListRect.top = attributeFilterRect.bottom +
+                             (attributeFilterRect.top - detailsTabsRect.bottom);
     // Height will be adjusted automatically.
     attributesListRect.bottom = attributesListRect.top;
     attributesList.SetWindowPos(nullptr, &attributesListRect,
@@ -1256,6 +1278,10 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
                         (DWORD_PTR)this);
     ::SetWindowSubclass(GetDlgItem(IDC_DETAILS_TABS), TabCtrlSubclassProc, 0,
                         (DWORD_PTR)this);
+    for (int id : {IDC_ATTRIBUTE_LIST, IDC_VISUAL_STATE_TREE}) {
+        ::SetWindowSubclass(GetDlgItem(id), DetailsKeyboardSubclassProc, 0,
+                            (DWORD_PTR)this);
+    }
 
     HWND hGrip = GetDlgItem(ATL_IDW_STATUS_BAR);
     if (hGrip) {
@@ -1299,6 +1325,8 @@ void CMainDlg::ApplyDarkMode() {
           IDC_CLASS_STATIC,     IDC_NAME_STATIC,         IDC_RECT_STATIC}) {
         dark_mode::SetControlTheme(GetDlgItem(id), m_darkMode);
     }
+
+    dark_mode::SetControlTheme(m_attributeFilterEdit, m_darkMode);
 
     // List view header.
     CHeaderCtrl header =
@@ -1432,6 +1460,24 @@ LRESULT CALLBACK CMainDlg::ListViewSubclassProc(HWND hWnd,
     return ::DefSubclassProc(hWnd, uMsg, wParam, lParam);
 }
 
+LRESULT CALLBACK CMainDlg::DetailsKeyboardSubclassProc(HWND hWnd,
+                                                       UINT uMsg,
+                                                       WPARAM wParam,
+                                                       LPARAM lParam,
+                                                       UINT_PTR uIdSubclass,
+                                                       DWORD_PTR dwRefData) {
+    auto* pThis = reinterpret_cast<CMainDlg*>(dwRefData);
+    if (uMsg == WM_KEYDOWN && wParam == 'F' && ::GetKeyState(VK_CONTROL) < 0) {
+        pThis->FocusAttributeFilter();
+        return 0;
+    }
+    if (uMsg == WM_CHAR && wParam == 6) {
+        // Ctrl+F, already handled in WM_KEYDOWN, prevent the beep.
+        return 0;
+    }
+    return ::DefSubclassProc(hWnd, uMsg, wParam, lParam);
+}
+
 LRESULT CALLBACK CMainDlg::GripSubclassProc(HWND hWnd,
                                             UINT uMsg,
                                             WPARAM wParam,
@@ -1520,6 +1566,11 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
         case TIMER_ID_SET_SELECTED_ELEMENT_INFORMATION:
             KillTimer(nIDEvent);
             SetSelectedElementInformation();
+            break;
+
+        case TIMER_ID_ATTRIBUTE_FILTER:
+            KillTimer(nIDEvent);
+            ApplyAttributeFilter();
             break;
 
         case TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION:
@@ -1904,6 +1955,65 @@ LRESULT CMainDlg::OnDetailsTabsSelChange(LPNMHDR pnmh) {
     }
 
     return 0;
+}
+
+void CMainDlg::OnAttributeFilterChange(UINT uNotifyCode,
+                                       int nID,
+                                       CWindow wndCtl) {
+    m_attributeFilterEdit.UpdateClearButton();
+
+    // Apply the filter only after the user stops typing for a short time.
+    constexpr UINT kAttributeFilterDelay = 200;
+    SetTimer(TIMER_ID_ATTRIBUTE_FILTER, kAttributeFilterDelay);
+}
+
+bool CMainDlg::AttributeFilterOnKeyDown(UINT nChar) {
+    switch (nChar) {
+        case VK_RETURN:
+            ApplyAttributeFilter();
+            return true;
+
+        case VK_ESCAPE:
+            if (m_attributeFilterEdit.GetWindowTextLength() > 0) {
+                m_attributeFilterEdit.SetWindowText(L"");
+                ApplyAttributeFilter();
+            } else if (m_attributesList.IsWindowVisible()) {
+                m_attributesList.SetFocus();
+            } else {
+                GetDlgItem(IDC_VISUAL_STATE_TREE).SetFocus();
+            }
+            return true;
+    }
+
+    return false;
+}
+
+void CMainDlg::FocusAttributeFilter() {
+    m_attributeFilterEdit.SetFocus();
+    m_attributeFilterEdit.SetSelAll();
+}
+
+void CMainDlg::ApplyAttributeFilter() {
+    KillTimer(TIMER_ID_ATTRIBUTE_FILTER);
+
+    CString filter;
+    m_attributeFilterEdit.GetWindowText(filter);
+    filter.Trim();
+
+    std::wstring newFilter(filter.GetString(), filter.GetLength());
+    if (newFilter == m_attributeFilter) {
+        return;
+    }
+
+    m_attributeFilter = std::move(newFilter);
+
+    auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+    auto selectedItem = treeView.GetSelectedItem();
+    if (selectedItem && selectedItem.GetParent()) {
+        auto handle = HandleFromLParam(selectedItem.GetData());
+        PopulateAttributesList(handle);
+        PopulateVisualStatesTree(handle);
+    }
 }
 
 LRESULT CMainDlg::OnAttributesListDblClk(LPNMHDR pnmh) {
@@ -2487,6 +2597,14 @@ void CMainDlg::PopulateAttributesList(InstanceHandle handle) {
         auto [value, valueShownAsIs] =
             FormatPropertyValue(v, m_xamlDiagnostics.get());
 
+        if (!ContainsCaseInsensitive(
+                {v.PropertyName,
+                 v.PropertyName ? SysStringLen(v.PropertyName) : 0},
+                m_attributeFilter) &&
+            !ContainsCaseInsensitive(value, m_attributeFilter)) {
+            continue;
+        }
+
         int c = 0;
 
         attributesList.AddItem(row, c++, v.PropertyName);
@@ -2553,22 +2671,42 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
             throw std::runtime_error("Unsupported element");
         }
 
-        auto populateList = [&visualStatesTree](auto visualStateGroups) {
+        const auto& filter = m_attributeFilter;
+
+        auto populateList = [&visualStatesTree,
+                             &filter](auto visualStateGroups) {
             for (const auto& group : visualStateGroups) {
-                auto groupName = group.Name();
+                std::wstring groupName(group.Name());
                 if (groupName.empty()) {
                     groupName = L"(unnamed)";
                 }
 
+                // If the group name matches the filter, show all of its
+                // states. Otherwise, show only the matching states.
+                bool groupMatches = ContainsCaseInsensitive(groupName, filter);
+
                 auto currentState = group.CurrentState();
 
-                auto groupItem = visualStatesTree.InsertItem(
-                    groupName.c_str(), TVI_ROOT, TVI_LAST);
+                CTreeItem groupItem;
+                if (groupMatches) {
+                    groupItem = visualStatesTree.InsertItem(groupName.c_str(),
+                                                            TVI_ROOT, TVI_LAST);
+                }
 
                 for (auto state : group.States()) {
                     std::wstring name(state.Name());
                     if (name.empty()) {
                         name = L"(unnamed)";
+                    }
+
+                    if (!groupMatches &&
+                        !ContainsCaseInsensitive(name, filter)) {
+                        continue;
+                    }
+
+                    if (!groupItem) {
+                        groupItem = visualStatesTree.InsertItem(
+                            groupName.c_str(), TVI_ROOT, TVI_LAST);
                     }
 
                     if (state == currentState) {
@@ -2579,7 +2717,9 @@ void CMainDlg::PopulateVisualStatesTree(InstanceHandle handle) {
                                                 TVI_LAST);
                 }
 
-                groupItem.Expand();
+                if (groupItem) {
+                    groupItem.Expand();
+                }
             }
         };
 

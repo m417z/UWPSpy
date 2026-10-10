@@ -1,6 +1,7 @@
 #pragma once
 
 #include "resource.h"
+#include "search_edit.h"
 #include "winrt.hpp"
 
 #include "../common/dark_mode.h"
@@ -12,6 +13,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     enum {
         TIMER_ID_REDRAW_TREE = 1,
         TIMER_ID_SET_SELECTED_ELEMENT_INFORMATION,
+        TIMER_ID_ATTRIBUTE_FILTER,
         TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION,
         TIMER_ID_COPY_SUBTREE_DELAYED,
     };
@@ -55,6 +57,8 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         COMMAND_ID_HANDLER_EX(IDC_SPLIT_TOGGLE, OnSplitToggle)
         NOTIFY_HANDLER_EX(IDC_DETAILS_TABS, TCN_SELCHANGE,
                           OnDetailsTabsSelChange)
+        COMMAND_HANDLER_EX(IDC_ATTRIBUTE_FILTER, EN_CHANGE,
+                           OnAttributeFilterChange)
         NOTIFY_HANDLER_EX(IDC_ATTRIBUTE_LIST, NM_DBLCLK, OnAttributesListDblClk)
         COMMAND_HANDLER_EX(IDC_PROPERTY_NAME, CBN_SELCHANGE,
                            OnPropertyNameSelChange)
@@ -85,6 +89,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_RECT_STATIC, DLSZ_MOVE_X)
             DLGRESIZE_CONTROL(IDC_RECT_EDIT, DLSZ_MOVE_X)
             DLGRESIZE_CONTROL(IDC_DETAILS_TABS, DLSZ_MOVE_X)
+            DLGRESIZE_CONTROL(IDC_ATTRIBUTE_FILTER, DLSZ_MOVE_X)
             DLGRESIZE_CONTROL(IDC_ATTRIBUTE_LIST, DLSZ_MOVE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_VISUAL_STATE_TREE, DLSZ_MOVE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_NAME, DLSZ_MOVE_X | DLSZ_MOVE_Y)
@@ -113,6 +118,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
             DLGRESIZE_CONTROL(IDC_RECT_STATIC, 0)
             DLGRESIZE_CONTROL(IDC_RECT_EDIT, DLSZ_SIZE_X)
             DLGRESIZE_CONTROL(IDC_DETAILS_TABS, DLSZ_SIZE_X)
+            DLGRESIZE_CONTROL(IDC_ATTRIBUTE_FILTER, DLSZ_SIZE_X)
             DLGRESIZE_CONTROL(IDC_ATTRIBUTE_LIST, DLSZ_SIZE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_VISUAL_STATE_TREE, DLSZ_SIZE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_PROPERTY_NAME, DLSZ_SIZE_X | DLSZ_MOVE_Y)
@@ -154,6 +160,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     LRESULT OnElementTreeSelChanged(LPNMHDR pnmh);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnDetailsTabsSelChange(LPNMHDR pnmh);
+    void OnAttributeFilterChange(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnAttributesListDblClk(LPNMHDR pnmh);
     void OnPropertyNameSelChange(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnPropertyIsXaml(UINT uNotifyCode, int nID, CWindow wndCtl);
@@ -177,6 +184,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void ResetAttributesListColumns();
     void PopulateAttributesList(InstanceHandle handle);
     void PopulateVisualStatesTree(InstanceHandle handle);
+    bool AttributeFilterOnKeyDown(UINT nChar);
+
+    void FocusAttributeFilter();
+    void ApplyAttributeFilter();
     void AddItemToTree(HTREEITEM parentTreeItem,
                        HTREEITEM insertAfter,
                        InstanceHandle handle,
@@ -200,6 +211,12 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
                                                  LPARAM lParam,
                                                  UINT_PTR uIdSubclass,
                                                  DWORD_PTR dwRefData);
+    static LRESULT CALLBACK DetailsKeyboardSubclassProc(HWND hWnd,
+                                                        UINT uMsg,
+                                                        WPARAM wParam,
+                                                        LPARAM lParam,
+                                                        UINT_PTR uIdSubclass,
+                                                        DWORD_PTR dwRefData);
     static LRESULT CALLBACK TabCtrlSubclassProc(HWND hWnd,
                                                 UINT uMsg,
                                                 WPARAM wParam,
@@ -217,6 +234,8 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;
     bool m_sticky = false;
     CSortListViewCtrl m_attributesList;
+    CSearchEdit m_attributeFilterEdit;
+    std::wstring m_attributeFilter;
     bool m_listCollapsed = false;
     bool m_highlightSelection = true;
     bool m_detailedProperties = false;
