@@ -1207,9 +1207,9 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     DlgResize_Init();
 
     // Init UI elements.
-    SetWindowText(std::format(L"UWPSpy - PID: {} TID: {}",
-                              GetCurrentProcessId(), GetCurrentThreadId())
-                      .c_str());
+    m_windowTitle = std::format(L"UWPSpy - PID: {} TID: {}",
+                                GetCurrentProcessId(), GetCurrentThreadId());
+    SetWindowText(m_windowTitle.c_str());
 
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
     m_elementTree.SubclassWindow(treeView);
@@ -1516,6 +1516,17 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
             }
             break;
         }
+
+        case TIMER_ID_SELECT_ELEMENT_FROM_CURSOR_DELAYED:
+            m_selectElementFromCursorCountdown--;
+            UpdateSelectElementFromCursorCountdown();
+            if (m_selectElementFromCursorCountdown <= 0) {
+                KillTimer(nIDEvent);
+                if (!SelectElementFromCursor()) {
+                    ::MessageBeep(MB_ICONWARNING);
+                }
+            }
+            break;
 
         case TIMER_ID_SET_SELECTED_ELEMENT_INFORMATION:
             KillTimer(nIDEvent);
@@ -2177,8 +2188,13 @@ LRESULT CMainDlg::OnDestroyWindow(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
 void CMainDlg::ElementTreeOnChar(TCHAR chChar, UINT nRepCnt, UINT nFlags) {
     if (chChar == 4) {
-        // Ctrl+D.
-        SelectElementFromCursor();
+        if (::GetKeyState(VK_SHIFT) < 0) {
+            // Ctrl+Shift+D.
+            SelectElementFromCursorDelayed();
+        } else {
+            // Ctrl+D.
+            SelectElementFromCursor();
+        }
     } else {
         SetMsgHandled(FALSE);
     }
@@ -2672,6 +2688,26 @@ bool CMainDlg::SelectElementFromCursor() {
     treeView.SelectItem(treeItem);
     treeView.EnsureVisible(treeItem);
     return true;
+}
+
+void CMainDlg::SelectElementFromCursorDelayed() {
+    // Allows to open a popup or a flyout which closes when it loses focus.
+    constexpr int kSelectElementFromCursorDelaySeconds = 5;
+
+    m_selectElementFromCursorCountdown = kSelectElementFromCursorDelaySeconds;
+    UpdateSelectElementFromCursorCountdown();
+    SetTimer(TIMER_ID_SELECT_ELEMENT_FROM_CURSOR_DELAYED, 1000);
+}
+
+void CMainDlg::UpdateSelectElementFromCursorCountdown() {
+    if (m_selectElementFromCursorCountdown > 0) {
+        SetWindowText(
+            std::format(L"{} - Selecting the element under the cursor in {}...",
+                        m_windowTitle, m_selectElementFromCursorCountdown)
+                .c_str());
+    } else {
+        SetWindowText(m_windowTitle.c_str());
+    }
 }
 
 void CMainDlg::OnElementTreeContextMenu(CTreeViewCtrlEx treeView,
