@@ -11,6 +11,9 @@ namespace {
 // Otherwise, multiple redraw operations can make the UI very slow.
 constexpr UINT kRedrawTreeDelay = 200;
 
+// Search the element tree only after the user stops typing for kSearchDelay ms.
+constexpr UINT kSearchDelay = 200;
+
 bool CopyTextToClipboard(HWND hWndParent, std::wstring_view text) {
     size_t bytes = (text.size() + 1) * sizeof(WCHAR);
     HGLOBAL hClipboardData = ::GlobalAlloc(GMEM_MOVEABLE, bytes);
@@ -59,6 +62,24 @@ void TreeViewExpandRecursively(HWND hTree, HTREEITEM hItem, DWORD flag) {
         }
         hItem = TreeView_GetNextSibling(hTree, hItem);
     }
+}
+
+// Returns the item that follows the given item in a pre-order traversal of the
+// tree, regardless of whether items are expanded or collapsed.
+HTREEITEM TreeViewGetNextItemPreOrder(HWND hTree, HTREEITEM hItem) {
+    if (HTREEITEM child = TreeView_GetChild(hTree, hItem)) {
+        return child;
+    }
+
+    while (hItem) {
+        if (HTREEITEM sibling = TreeView_GetNextSibling(hTree, hItem)) {
+            return sibling;
+        }
+
+        hItem = TreeView_GetParent(hTree, hItem);
+    }
+
+    return nullptr;
 }
 
 void TreeViewSubtreeToStringRecursively(CTreeViewCtrlEx tree,
@@ -1215,6 +1236,10 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     m_elementTree.SubclassWindow(treeView);
     treeView.SetExtendedStyle(TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
 
+    m_searchEdit.Init(GetDlgItem(IDC_SEARCH_EDIT), L"Search elements (Ctrl+F)");
+    m_searchEdit.SetKeyDownHandler(
+        [this](UINT nChar) { return SearchEditOnKeyDown(nChar); });
+
     auto detailsTabs = CTabCtrl(GetDlgItem(IDC_DETAILS_TABS));
     detailsTabs.InsertItem(0, L"Attributes");
     detailsTabs.InsertItem(1, L"Detailed attributes");
@@ -1296,7 +1321,9 @@ void CMainDlg::ApplyDarkMode() {
           IDC_PROPERTY_IS_XAML, IDC_HIGHLIGHT_SELECTION, IDC_STICKY,
           IDC_CLASS_EDIT,       IDC_NAME_EDIT,           IDC_RECT_EDIT,
           IDC_PROPERTY_VALUE,   IDC_PROPERTY_VALUE_XAML, IDC_PROPERTY_NAME,
-          IDC_CLASS_STATIC,     IDC_NAME_STATIC,         IDC_RECT_STATIC}) {
+          IDC_CLASS_STATIC,     IDC_NAME_STATIC,         IDC_RECT_STATIC,
+          IDC_SEARCH_EDIT,      IDC_SEARCH_STATUS,       IDC_SEARCH_PREV,
+          IDC_SEARCH_NEXT}) {
         dark_mode::SetControlTheme(GetDlgItem(id), m_darkMode);
     }
 
@@ -1525,6 +1552,11 @@ void CMainDlg::OnTimer(UINT_PTR nIDEvent) {
         case TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION:
             KillTimer(nIDEvent);
             RefreshSelectedElementInformation(0);
+            break;
+
+        case TIMER_ID_SEARCH:
+            KillTimer(nIDEvent);
+            SearchElementTree(/*forward=*/true, /*includeCurrent=*/true);
             break;
 
         case TIMER_ID_COPY_SUBTREE_DELAYED: {
@@ -1844,6 +1876,22 @@ LRESULT CMainDlg::OnElementTreeSelChanged(LPNMHDR pnmh) {
     }
 
     return 0;
+}
+
+void CMainDlg::OnSearchEditChange(UINT uNotifyCode, int nID, CWindow wndCtl) {
+    m_searchEdit.UpdateClearButton();
+
+    // Search as the user types, but wait for a short pause to avoid jumping
+    // around the tree on each keystroke.
+    SetTimer(TIMER_ID_SEARCH, kSearchDelay);
+}
+
+void CMainDlg::OnSearchPrev(UINT uNotifyCode, int nID, CWindow wndCtl) {
+    SearchElementTree(/*forward=*/false, /*includeCurrent=*/false);
+}
+
+void CMainDlg::OnSearchNext(UINT uNotifyCode, int nID, CWindow wndCtl) {
+    SearchElementTree(/*forward=*/true, /*includeCurrent=*/false);
 }
 
 void CMainDlg::OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl) {
@@ -2175,13 +2223,137 @@ LRESULT CMainDlg::OnDestroyWindow(UINT uMsg, WPARAM wParam, LPARAM lParam) {
     return 0;
 }
 
+void CMainDlg::ElementTreeOnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags) {
+    if (nChar == VK_F3) {
+        bool forward = ::GetKeyState(VK_SHIFT) >= 0;
+        if (!SearchElementTree(forward, /*includeCurrent=*/false)) {
+            FocusSearch();
+        }
+    } else {
+        SetMsgHandled(FALSE);
+    }
+}
+
 void CMainDlg::ElementTreeOnChar(TCHAR chChar, UINT nRepCnt, UINT nFlags) {
     if (chChar == 4) {
         // Ctrl+D.
         SelectElementFromCursor();
+    } else if (chChar == 6) {
+        // Ctrl+F.
+        FocusSearch();
     } else {
         SetMsgHandled(FALSE);
     }
+}
+
+bool CMainDlg::SearchEditOnKeyDown(UINT nChar) {
+    switch (nChar) {
+        case VK_RETURN:
+        case VK_F3:
+            SearchElementTree(/*forward=*/::GetKeyState(VK_SHIFT) >= 0,
+                              /*includeCurrent=*/false);
+            return true;
+
+        case VK_DOWN:
+            SearchElementTree(/*forward=*/true, /*includeCurrent=*/false);
+            return true;
+
+        case VK_UP:
+            SearchElementTree(/*forward=*/false, /*includeCurrent=*/false);
+            return true;
+
+        case VK_ESCAPE:
+            if (m_searchEdit.GetWindowTextLength() > 0) {
+                m_searchEdit.SetWindowText(L"");
+            } else {
+                m_elementTree.SetFocus();
+            }
+            return true;
+    }
+
+    return false;
+}
+
+void CMainDlg::FocusSearch() {
+    m_searchEdit.SetFocus();
+    m_searchEdit.SetSelAll();
+}
+
+bool CMainDlg::SearchElementTree(bool forward, bool includeCurrent) {
+    KillTimer(TIMER_ID_SEARCH);
+
+    CString query;
+    m_searchEdit.GetWindowText(query);
+    query.Trim();
+    if (query.IsEmpty()) {
+        SetDlgItemText(IDC_SEARCH_STATUS, L"");
+        return false;
+    }
+
+    auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
+    HTREEITEM selectedItem = treeView.GetSelectedItem();
+
+    // Collect all matching items in tree order, and note where the current
+    // selection is relative to them.
+    std::vector<HTREEITEM> matches;
+    size_t matchesBeforeSelection = 0;
+    bool selectionMatches = false;
+    bool selectionFound = false;
+
+    CString itemText;
+    for (HTREEITEM item = treeView.GetRootItem(); item;
+         item = TreeViewGetNextItemPreOrder(treeView, item)) {
+        bool isSelected = item == selectedItem;
+        if (isSelected) {
+            selectionFound = true;
+            matchesBeforeSelection = matches.size();
+        }
+
+        treeView.GetItemText(item, itemText);
+        if (::FindStringOrdinal(FIND_FROMSTART, itemText, itemText.GetLength(),
+                                query, query.GetLength(), TRUE) != -1) {
+            if (isSelected) {
+                selectionMatches = true;
+            }
+
+            matches.push_back(item);
+        }
+    }
+
+    if (matches.empty()) {
+        SetDlgItemText(IDC_SEARCH_STATUS, L"No results");
+        return false;
+    }
+
+    size_t targetIndex;
+    if (!selectionFound) {
+        targetIndex = forward ? 0 : matches.size() - 1;
+    } else if (forward) {
+        targetIndex = matchesBeforeSelection;
+        if (selectionMatches && !includeCurrent) {
+            targetIndex++;
+        }
+
+        if (targetIndex >= matches.size()) {
+            targetIndex = 0;
+        }
+    } else {
+        targetIndex = matchesBeforeSelection > 0 ? matchesBeforeSelection - 1
+                                                 : matches.size() - 1;
+    }
+
+    HTREEITEM targetItem = matches[targetIndex];
+    if (targetItem != selectedItem) {
+        treeView.SelectItem(targetItem);
+        SetSelectedElementInformation();
+    }
+
+    treeView.EnsureVisible(targetItem);
+
+    SetDlgItemText(
+        IDC_SEARCH_STATUS,
+        std::format(L"{}/{}", targetIndex + 1, matches.size()).c_str());
+    return true;
 }
 
 void CMainDlg::RedrawTreeQueue() {
