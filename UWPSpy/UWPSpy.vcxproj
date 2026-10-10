@@ -350,6 +350,7 @@
     <ClInclude Include="flash_area.h" />
     <ClInclude Include="MainDlg.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="search_edit.h" />
     <ClInclude Include="simplefactory.hpp" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="tap.hpp" />

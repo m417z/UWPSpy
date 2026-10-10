@@ -1,6 +1,7 @@
 #pragma once
 
 #include "resource.h"
+#include "search_edit.h"
 #include "winrt.hpp"
 
 #include "../common/dark_mode.h"
@@ -14,6 +15,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         TIMER_ID_SET_SELECTED_ELEMENT_INFORMATION,
         TIMER_ID_REFRESH_SELECTED_ELEMENT_INFORMATION,
         TIMER_ID_COPY_SUBTREE_DELAYED,
+        TIMER_ID_SEARCH,
     };
 
     enum {
@@ -52,6 +54,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         MSG_WM_SETTINGCHANGE(OnSettingChange)
         NOTIFY_HANDLER_EX(IDC_ELEMENT_TREE, TVN_SELCHANGED,
                           OnElementTreeSelChanged)
+        COMMAND_HANDLER_EX(IDC_SEARCH_EDIT, EN_CHANGE, OnSearchEditChange)
+        COMMAND_ID_HANDLER_EX(IDC_SEARCH_PREV, OnSearchPrev)
+        COMMAND_ID_HANDLER_EX(IDC_SEARCH_NEXT, OnSearchNext)
         COMMAND_ID_HANDLER_EX(IDC_SPLIT_TOGGLE, OnSplitToggle)
         NOTIFY_HANDLER_EX(IDC_DETAILS_TABS, TCN_SELCHANGE,
                           OnDetailsTabsSelChange)
@@ -71,11 +76,16 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         MESSAGE_HANDLER_EX(UWM_DESTROY_WINDOW, OnDestroyWindow)
         // ----------
         ALT_MSG_MAP(1)
+        MSG_WM_KEYDOWN(ElementTreeOnKeyDown)
         MSG_WM_CHAR(ElementTreeOnChar)
     END_MSG_MAP()
 
     struct ResizeData : public CDialogResize<ResizeData> {
         BEGIN_DLGRESIZE_MAP(ResizeData)
+            DLGRESIZE_CONTROL(IDC_SEARCH_EDIT, DLSZ_SIZE_X)
+            DLGRESIZE_CONTROL(IDC_SEARCH_STATUS, DLSZ_MOVE_X)
+            DLGRESIZE_CONTROL(IDC_SEARCH_PREV, DLSZ_MOVE_X)
+            DLGRESIZE_CONTROL(IDC_SEARCH_NEXT, DLSZ_MOVE_X)
             DLGRESIZE_CONTROL(IDC_ELEMENT_TREE, DLSZ_SIZE_X | DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_SPLIT_TOGGLE, DLSZ_MOVE_X | DLSZ_CENTER_Y)
             DLGRESIZE_CONTROL(IDC_CLASS_STATIC, DLSZ_MOVE_X)
@@ -104,6 +114,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     struct ResizeDataAttributesExpanded
         : public CDialogResize<ResizeDataAttributesExpanded> {
         BEGIN_DLGRESIZE_MAP(ResizeDataAttributesExpanded)
+            DLGRESIZE_CONTROL(IDC_SEARCH_EDIT, 0)
+            DLGRESIZE_CONTROL(IDC_SEARCH_STATUS, 0)
+            DLGRESIZE_CONTROL(IDC_SEARCH_PREV, 0)
+            DLGRESIZE_CONTROL(IDC_SEARCH_NEXT, 0)
             DLGRESIZE_CONTROL(IDC_ELEMENT_TREE, DLSZ_SIZE_Y)
             DLGRESIZE_CONTROL(IDC_SPLIT_TOGGLE, DLSZ_CENTER_Y)
             DLGRESIZE_CONTROL(IDC_CLASS_STATIC, 0)
@@ -152,6 +166,9 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnSettingChange(UINT uFlags, LPCTSTR lpszSection);
     HBRUSH OnCtlColorEdit(CDCHandle dc, CEdit wndEdit);
     LRESULT OnElementTreeSelChanged(LPNMHDR pnmh);
+    void OnSearchEditChange(UINT uNotifyCode, int nID, CWindow wndCtl);
+    void OnSearchPrev(UINT uNotifyCode, int nID, CWindow wndCtl);
+    void OnSearchNext(UINT uNotifyCode, int nID, CWindow wndCtl);
     void OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl);
     LRESULT OnDetailsTabsSelChange(LPNMHDR pnmh);
     LRESULT OnAttributesListDblClk(LPNMHDR pnmh);
@@ -169,7 +186,12 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     void OnFinalMessage(HWND hWnd) override;
 
+    void ElementTreeOnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
     void ElementTreeOnChar(TCHAR chChar, UINT nRepCnt, UINT nFlags);
+    bool SearchEditOnKeyDown(UINT nChar);
+
+    void FocusSearch();
+    bool SearchElementTree(bool forward, bool includeCurrent);
 
     void RedrawTreeQueue();
     bool SetSelectedElementInformation();
@@ -215,6 +237,7 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     CIcon m_icon, m_smallIcon;
     CContainedWindowT<CTreeViewCtrlEx> m_elementTree;
+    CSearchEdit m_searchEdit;
     bool m_sticky = false;
     CSortListViewCtrl m_attributesList;
     bool m_listCollapsed = false;
