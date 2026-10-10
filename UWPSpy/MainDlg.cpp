@@ -2870,14 +2870,53 @@ void CMainDlg::OnAttributesListContextMenu(CListViewCtrl listView,
     enum {
         MENU_ID_COPY_ITEM = 1,
         MENU_ID_COPY_ALL_ITEMS,
+        MENU_ID_COPY_ITEM_AS_NAME_VALUE,
+        MENU_ID_COPY_ALL_ITEMS_AS_NAME_VALUE,
     };
 
     menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM, L"Copy item");
     menu.AppendMenu(MF_STRING, MENU_ID_COPY_ALL_ITEMS, L"Copy all items");
+    menu.AppendMenu(MF_SEPARATOR);
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ITEM_AS_NAME_VALUE,
+                    L"Copy item as Name=Value");
+    menu.AppendMenu(MF_STRING, MENU_ID_COPY_ALL_ITEMS_AS_NAME_VALUE,
+                    L"Copy all items as Name=Value");
+
+    // Returns "Name=Value", the format used by styler mods.
+    auto getItemAsNameValue = [&listView](int item) {
+        CString name;
+        listView.GetItemText(item, 0, name);
+        CString value;
+        listView.GetItemText(item, 1, value);
+        return name + L'=' + value;
+    };
 
     int nCmd = menu.TrackPopupMenu(TPM_RIGHTBUTTON | TPM_RETURNCMD, menuPoint.x,
                                    menuPoint.y, m_hWnd);
     switch (nCmd) {
+        case MENU_ID_COPY_ITEM_AS_NAME_VALUE: {
+            CString itemText = getItemAsNameValue(targetItem);
+            if (!CopyTextToClipboard(m_hWnd, {itemText.GetString(),
+                                              (size_t)itemText.GetLength()})) {
+                MessageBox(L"Failed to copy item text to clipboard", L"Error");
+            }
+            break;
+        }
+
+        case MENU_ID_COPY_ALL_ITEMS_AS_NAME_VALUE: {
+            CString str;
+            for (int i = 0; i < listView.GetItemCount(); i++) {
+                str += getItemAsNameValue(i) + L'\n';
+            }
+
+            if (!CopyTextToClipboard(
+                    m_hWnd, {str.GetString(), (size_t)str.GetLength()})) {
+                MessageBox(L"Failed to copy all items text to clipboard",
+                           L"Error");
+            }
+            break;
+        }
+
         case MENU_ID_COPY_ITEM: {
             int columns = listView.GetHeader().GetItemCount();
             CString columnText;
