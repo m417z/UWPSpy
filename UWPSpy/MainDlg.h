@@ -237,6 +237,10 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
     CString m_lastPropertySelection;
 
+    // If the selected element is removed from the tree, it's selected again if
+    // it's re-added, e.g. if one of its ancestors is re-parented.
+    InstanceHandle m_reselectHandle = 0;
+
     InstanceHandle m_delayedCopySubtreeHandle = 0;
     bool m_delayedCopySubtreeWithProperties = false;
 
