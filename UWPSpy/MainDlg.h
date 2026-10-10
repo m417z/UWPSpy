@@ -39,11 +39,18 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
 
    private:
     BEGIN_MSG_MAP_EX(CMainDlg)
+        // Must come before CDialogResize to adjust the layout data first.
+        MSG_WM_SIZE(OnSize)
         CHAIN_MSG_MAP(CDialogResize<CMainDlg>)
         MSG_WM_INITDIALOG(OnInitDialog)
         MSG_WM_DESTROY(OnDestroy)
         MSG_WM_NCACTIVATE(OnNcActivate)
         MSG_WM_TIMER(OnTimer)
+        MSG_WM_SETCURSOR(OnSetCursor)
+        MSG_WM_LBUTTONDOWN(OnLButtonDown)
+        MSG_WM_MOUSEMOVE(OnMouseMove)
+        MSG_WM_LBUTTONUP(OnLButtonUp)
+        MSG_WM_CAPTURECHANGED(OnCaptureChanged)
         MSG_WM_CONTEXTMENU(OnContextMenu)
         MSG_WM_CTLCOLORDLG(OnCtlColorDlg)
         MSG_WM_CTLCOLORSTATIC(OnCtlColorStatic)
@@ -101,38 +108,11 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         END_DLGRESIZE_MAP()
     };
 
-    struct ResizeDataAttributesExpanded
-        : public CDialogResize<ResizeDataAttributesExpanded> {
-        BEGIN_DLGRESIZE_MAP(ResizeDataAttributesExpanded)
-            DLGRESIZE_CONTROL(IDC_ELEMENT_TREE, DLSZ_SIZE_Y)
-            DLGRESIZE_CONTROL(IDC_SPLIT_TOGGLE, DLSZ_CENTER_Y)
-            DLGRESIZE_CONTROL(IDC_CLASS_STATIC, 0)
-            DLGRESIZE_CONTROL(IDC_CLASS_EDIT, DLSZ_SIZE_X)
-            DLGRESIZE_CONTROL(IDC_NAME_STATIC, 0)
-            DLGRESIZE_CONTROL(IDC_NAME_EDIT, DLSZ_SIZE_X)
-            DLGRESIZE_CONTROL(IDC_RECT_STATIC, 0)
-            DLGRESIZE_CONTROL(IDC_RECT_EDIT, DLSZ_SIZE_X)
-            DLGRESIZE_CONTROL(IDC_DETAILS_TABS, DLSZ_SIZE_X)
-            DLGRESIZE_CONTROL(IDC_ATTRIBUTE_LIST, DLSZ_SIZE_X | DLSZ_SIZE_Y)
-            DLGRESIZE_CONTROL(IDC_VISUAL_STATE_TREE, DLSZ_SIZE_X | DLSZ_SIZE_Y)
-            DLGRESIZE_CONTROL(IDC_PROPERTY_NAME, DLSZ_SIZE_X | DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_PROPERTY_VALUE, DLSZ_SIZE_X | DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_PROPERTY_VALUE_XAML,
-                              DLSZ_SIZE_X | DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_PROPERTY_IS_XAML, DLSZ_MOVE_X | DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_PROPERTY_REMOVE, DLSZ_MOVE_X | DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_PROPERTY_SET, DLSZ_MOVE_X | DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_COLLAPSE_ALL, DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_HIGHLIGHT_SELECTION, DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(IDC_STICKY, DLSZ_MOVE_X | DLSZ_MOVE_Y)
-            DLGRESIZE_CONTROL(ID_APP_ABOUT, DLSZ_MOVE_X | DLSZ_MOVE_Y)
-        END_DLGRESIZE_MAP()
-    };
-
+    // The element tree takes all the extra width by default. The splitter
+    // between the element tree and the details pane can be dragged, in which
+    // case the layout data is adjusted in UpdateSplitterResizeData.
     const _AtlDlgResizeMap* GetDlgResizeMap() {
-        return m_splitModeAttributesExpanded
-                   ? ResizeDataAttributesExpanded::GetDlgResizeMap()
-                   : ResizeData::GetDlgResizeMap();
+        return ResizeData::GetDlgResizeMap();
     }
 
     struct ElementItem {
@@ -141,10 +121,16 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
         HTREEITEM treeItem;
     };
 
+    void OnSize(UINT nType, CSize size);
     BOOL OnInitDialog(CWindow wndFocus, LPARAM lInitParam);
     void OnDestroy();
     BOOL OnNcActivate(BOOL bActive);
     void OnTimer(UINT_PTR nIDEvent);
+    BOOL OnSetCursor(CWindow wnd, UINT nHitTest, UINT message);
+    void OnLButtonDown(UINT nFlags, CPoint point);
+    void OnMouseMove(UINT nFlags, CPoint point);
+    void OnLButtonUp(UINT nFlags, CPoint point);
+    void OnCaptureChanged(CWindow wnd);
     void OnContextMenu(CWindow wnd, CPoint point);
     HBRUSH OnCtlColorDlg(CDCHandle dc, CWindow wnd);
     HBRUSH OnCtlColorStatic(CDCHandle dc, CStatic wndStatic);
@@ -170,6 +156,12 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     void OnFinalMessage(HWND hWnd) override;
 
     void ElementTreeOnChar(TCHAR chChar, UINT nRepCnt, UINT nFlags);
+
+    CRect GetSplitterRect();
+    int GetDefaultElementTreeWidth(int cxWidth);
+    int GetMinElementTreeWidth();
+    void SetElementTreeWidth(int width);
+    void UpdateSplitterResizeData(int cxWidth);
 
     void RedrawTreeQueue();
     bool SetSelectedElementInformation();
@@ -220,7 +212,15 @@ class CMainDlg : public CDialogImpl<CMainDlg>, public CDialogResize<CMainDlg> {
     bool m_listCollapsed = false;
     bool m_highlightSelection = true;
     bool m_detailedProperties = false;
-    bool m_splitModeAttributesExpanded = false;
+
+    // The original layout data, before splitter adjustments.
+    std::vector<_AtlDlgResizeData> m_dlgResizeDataOriginal;
+    // The element tree width in pixels set by the splitter, or 0 for the
+    // default layout in which the element tree takes all the extra width.
+    int m_elementTreeWidth = 0;
+    bool m_splitterDragging = false;
+    int m_splitterDragOffset = 0;
+
     bool m_redrawTreeQueued = false;
     bool m_redrawTreeQueuedEnsureSelectionVisible = false;
 

@@ -1205,6 +1205,9 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
 
     // Init resizing.
     DlgResize_Init();
+    for (int i = 0; i < m_arrData.GetSize(); i++) {
+        m_dlgResizeDataOriginal.push_back(m_arrData[i]);
+    }
 
     // Init UI elements.
     SetWindowText(std::format(L"UWPSpy - PID: {} TID: {}",
@@ -1265,6 +1268,15 @@ BOOL CMainDlg::OnInitDialog(CWindow wndFocus, LPARAM lInitParam) {
     ApplyDarkMode();
 
     return TRUE;
+}
+
+void CMainDlg::OnSize(UINT nType, CSize size) {
+    if (nType != SIZE_MINIMIZED) {
+        UpdateSplitterResizeData(size.cx);
+    }
+
+    // Let CDialogResize handle the rest.
+    SetMsgHandled(FALSE);
 }
 
 void CMainDlg::OnDestroy() {}
@@ -1596,6 +1608,165 @@ void CMainDlg::OnContextMenu(CWindow wnd, CPoint point) {
     }
 }
 
+BOOL CMainDlg::OnSetCursor(CWindow wnd, UINT nHitTest, UINT message) {
+    if (wnd == m_hWnd && nHitTest == HTCLIENT) {
+        CPoint pt;
+        ::GetCursorPos(&pt);
+        ScreenToClient(&pt);
+        if (GetSplitterRect().PtInRect(pt)) {
+            ::SetCursor(::LoadCursor(nullptr, IDC_SIZEWE));
+            return TRUE;
+        }
+    }
+
+    SetMsgHandled(FALSE);
+    return FALSE;
+}
+
+void CMainDlg::OnLButtonDown(UINT nFlags, CPoint point) {
+    CRect splitterRect = GetSplitterRect();
+    if (!splitterRect.PtInRect(point)) {
+        SetMsgHandled(FALSE);
+        return;
+    }
+
+    m_splitterDragging = true;
+    m_splitterDragOffset = point.x - splitterRect.left;
+    SetCapture();
+}
+
+void CMainDlg::OnMouseMove(UINT nFlags, CPoint point) {
+    if (!m_splitterDragging) {
+        SetMsgHandled(FALSE);
+        return;
+    }
+
+    CRect elementTreeRect;
+    GetDlgItem(IDC_ELEMENT_TREE).GetWindowRect(&elementTreeRect);
+    ScreenToClient(&elementTreeRect);
+
+    CRect clientRect;
+    GetClientRect(&clientRect);
+
+    int minWidth = GetMinElementTreeWidth();
+    int maxWidth =
+        std::max(minWidth, GetDefaultElementTreeWidth(clientRect.Width()));
+
+    int width = point.x - m_splitterDragOffset - elementTreeRect.left;
+    width = std::clamp(width, minWidth, maxWidth);
+    if (width != m_elementTreeWidth) {
+        SetElementTreeWidth(width);
+    }
+}
+
+void CMainDlg::OnLButtonUp(UINT nFlags, CPoint point) {
+    if (!m_splitterDragging) {
+        SetMsgHandled(FALSE);
+        return;
+    }
+
+    ::ReleaseCapture();
+}
+
+void CMainDlg::OnCaptureChanged(CWindow wnd) {
+    m_splitterDragging = false;
+}
+
+CRect CMainDlg::GetSplitterRect() {
+    CRect elementTreeRect;
+    GetDlgItem(IDC_ELEMENT_TREE).GetWindowRect(&elementTreeRect);
+    ScreenToClient(&elementTreeRect);
+
+    CRect classStaticRect;
+    GetDlgItem(IDC_CLASS_STATIC).GetWindowRect(&classStaticRect);
+    ScreenToClient(&classStaticRect);
+
+    return CRect(elementTreeRect.right, elementTreeRect.top,
+                 classStaticRect.left, elementTreeRect.bottom);
+}
+
+int CMainDlg::GetDefaultElementTreeWidth(int cxWidth) {
+    for (const auto& data : m_dlgResizeDataOriginal) {
+        if (data.m_nCtlID == IDC_ELEMENT_TREE) {
+            return data.m_rect.right - data.m_rect.left + cxWidth -
+                   m_sizeDialog.cx;
+        }
+    }
+
+    return 0;
+}
+
+int CMainDlg::GetMinElementTreeWidth() {
+    // The minimum width of the element tree when resized with the splitter.
+    constexpr int kMinElementTreeWidthDlu = 130;
+
+    CRect rect(0, 0, kMinElementTreeWidthDlu, 0);
+    MapDialogRect(&rect);
+    return rect.Width();
+}
+
+void CMainDlg::SetElementTreeWidth(int width) {
+    m_elementTreeWidth = width;
+    SetDlgItemText(IDC_SPLIT_TOGGLE, width ? L">" : L"<");
+
+    CRect clientRect;
+    GetClientRect(&clientRect);
+    UpdateSplitterResizeData(clientRect.Width());
+    DlgResize_UpdateLayout(clientRect.Width(), clientRect.Height());
+}
+
+void CMainDlg::UpdateSplitterResizeData(int cxWidth) {
+    if (m_dlgResizeDataOriginal.size() != (size_t)m_arrData.GetSize()) {
+        // Not initialized yet.
+        return;
+    }
+
+    // The amount of pixels to take from the element tree and give to the
+    // details pane, compared to the default layout.
+    int delta = 0;
+    if (m_elementTreeWidth) {
+        int defaultWidth = GetDefaultElementTreeWidth(cxWidth);
+        int width =
+            std::min(std::max(m_elementTreeWidth, GetMinElementTreeWidth()),
+                     defaultWidth);
+        delta = defaultWidth - width;
+    }
+
+    for (int i = 0; i < m_arrData.GetSize(); i++) {
+        auto& rect = m_arrData[i].m_rect;
+        rect = m_dlgResizeDataOriginal[i].m_rect;
+
+        switch (m_arrData[i].m_nCtlID) {
+            // Left of the splitter, shrink.
+            case IDC_ELEMENT_TREE:
+                rect.right -= delta;
+                break;
+
+            // The splitter toggle button and the labels on its right, move.
+            case IDC_SPLIT_TOGGLE:
+            case IDC_CLASS_STATIC:
+            case IDC_NAME_STATIC:
+            case IDC_RECT_STATIC:
+                rect.left -= delta;
+                rect.right -= delta;
+                break;
+
+            // Right of the splitter, grow.
+            case IDC_CLASS_EDIT:
+            case IDC_NAME_EDIT:
+            case IDC_RECT_EDIT:
+            case IDC_DETAILS_TABS:
+            case IDC_ATTRIBUTE_LIST:
+            case IDC_VISUAL_STATE_TREE:
+            case IDC_PROPERTY_NAME:
+            case IDC_PROPERTY_VALUE:
+            case IDC_PROPERTY_VALUE_XAML:
+                rect.left -= delta;
+                break;
+        }
+    }
+}
+
 InstanceHandle CMainDlg::ElementFromPoint(CPoint pt) {
     auto treeView = CTreeViewCtrlEx(GetDlgItem(IDC_ELEMENT_TREE));
 
@@ -1847,27 +2018,11 @@ LRESULT CMainDlg::OnElementTreeSelChanged(LPNMHDR pnmh) {
 }
 
 void CMainDlg::OnSplitToggle(UINT uNotifyCode, int nID, CWindow wndCtl) {
-    m_splitModeAttributesExpanded = !m_splitModeAttributesExpanded;
-    wndCtl.SetWindowText(m_splitModeAttributesExpanded ? L">" : L"<");
-
-    // Below is a very ugly hack to switch to another DlgResize layout.
-
-    CRect rectDlg;
-    GetClientRect(&rectDlg);
-
-    SetWindowPos(nullptr, 0, 0, m_sizeDialog.cx, m_sizeDialog.cy,
-                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-
-    DlgResize_Init();
-
-    ResizeClient(rectDlg.right, rectDlg.bottom);
-
-    // Re-apply dark mode to the resize grip.
-    HWND hGrip = GetDlgItem(ATL_IDW_STATUS_BAR);
-    if (hGrip) {
-        ::SetWindowSubclass(hGrip, GripSubclassProc, 0, (DWORD_PTR)this);
-        ::InvalidateRect(hGrip, nullptr, FALSE);
-    }
+    // Toggle between the default layout, in which the element tree takes all
+    // the extra width, and a layout in which the element tree keeps its
+    // initial width and the details pane takes all the extra width.
+    SetElementTreeWidth(
+        m_elementTreeWidth ? 0 : GetDefaultElementTreeWidth(m_sizeDialog.cx));
 }
 
 LRESULT CMainDlg::OnDetailsTabsSelChange(LPNMHDR pnmh) {
