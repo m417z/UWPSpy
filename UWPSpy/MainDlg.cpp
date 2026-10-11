@@ -259,6 +259,34 @@ bool IsTreeItemInView(CTreeItem treeItem) {
     return intersectionRect.IntersectRect(rect, clientRect);
 }
 
+// Resizes the last column of a report list view so that the columns fill the
+// list view of the given window width, unless that would make the column too
+// narrow. Space for a vertical scroll bar is always reserved, so that the
+// result doesn't depend on whether a scroll bar is currently shown, which can
+// be in flux while the list view is being resized or populated.
+void FillLastListViewColumn(CListViewCtrl listView, int windowWidth) {
+    int columnCount = listView.GetHeader().GetItemCount();
+    if (columnCount < 2) {
+        return;
+    }
+
+    int otherColumnsWidth = 0;
+    for (int i = 0; i < columnCount - 1; i++) {
+        otherColumnsWidth += listView.GetColumnWidth(i);
+    }
+
+    CRect borderRect;
+    ::AdjustWindowRectEx(&borderRect,
+                         listView.GetStyle() & ~WS_VSCROLL & ~WS_HSCROLL, FALSE,
+                         listView.GetExStyle());
+
+    int width = windowWidth - borderRect.Width() -
+                ::GetSystemMetrics(SM_CXVSCROLL) - otherColumnsWidth;
+
+    int minWidth = otherColumnsWidth / (columnCount - 1);
+    listView.SetColumnWidth(columnCount - 1, std::max(width, minWidth));
+}
+
 // https://stackoverflow.com/a/35277401
 void ListViewSetTopIndex(CListViewCtrl listView, int index) {
     CSize itemSpacing;
@@ -1416,6 +1444,15 @@ LRESULT CALLBACK CMainDlg::ListViewSubclassProc(HWND hWnd,
                                                 UINT_PTR uIdSubclass,
                                                 DWORD_PTR dwRefData) {
     auto* pThis = reinterpret_cast<CMainDlg*>(dwRefData);
+    if (uMsg == WM_WINDOWPOSCHANGING && !pThis->m_detailedProperties) {
+        // Make the value column fill the rest of the list. Do it before the
+        // list view handles the new size so that its scroll bars are updated
+        // according to the new column width.
+        auto* windowPos = reinterpret_cast<WINDOWPOS*>(lParam);
+        if (!(windowPos->flags & SWP_NOSIZE)) {
+            FillLastListViewColumn(hWnd, windowPos->cx);
+        }
+    }
     if (uMsg == WM_NOTIFY && pThis->m_darkMode) {
         auto* nmhdr = reinterpret_cast<LPNMHDR>(lParam);
         if (nmhdr->code == NM_CUSTOMDRAW) {
@@ -2370,6 +2407,10 @@ void CMainDlg::ResetAttributesListColumns() {
     } else {
         attributesList.InsertColumn(c++, L"Name", LVCFMT_LEFT, width / 2);
         attributesList.InsertColumn(c++, L"Value", LVCFMT_LEFT, width / 2);
+
+        CRect windowRect;
+        attributesList.GetWindowRect(windowRect);
+        FillLastListViewColumn(attributesList, windowRect.Width());
     }
 
     attributesList.SetRedraw(TRUE);
